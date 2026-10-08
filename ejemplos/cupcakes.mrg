@@ -1,0 +1,19 @@
+~ Receta: cupcakes de cumpleaños (el ejemplo del documento)
+molde secreto porciones huevos_por_tanda con 3.
+molde porciones tandas con 2.
+molde porciones huevos_total.
+molde tazas harina con 2,5.
+molde betun mensaje con "Feliz cumple".
+molde punto merengue_listo con crudo.
+
+vierte huevos_por_tanda * tandas en huevos_total.   ~ 6
+vierte harina * tandas en harina.                   ~ 5,0
+raspa 0,5 a harina.                                 ~ 4,5
+espolvorea ", Ana" a mensaje.                       ~ "Feliz cumple, Ana"
+vierte dorado en merengue_listo.
+
+sirve mensaje.
+sirve huevos_total.
+sirve harina.
+sirve merengue_listo.
+sirve degustar(harina).

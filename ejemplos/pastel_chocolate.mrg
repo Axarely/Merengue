@@ -1,0 +1,45 @@
+~ =============================================================
+~  Receta: pastel de chocolate para 8 personas
+~  Muestra todas las reglas de Merengue
+~ =============================================================
+
+~ ---- Regla 1: declaracion de moldes ----
+molde secreto porciones invitados con 8.        ~ constante: nunca cambia
+molde secreto tazas harina_por_persona con 0,25.
+molde porciones huevos.                         ~ sin 'con' -> vale 0
+molde tazas leche.                              ~ sin 'con' -> vale 0,0
+molde tazas harina_total.
+molde betun dedicatoria con "Feliz cumple".
+molde chispa inicial con 'M'.
+molde punto horneado.                           ~ sin 'con' -> crudo
+
+~ ---- Regla 2: asignacion (el valor va primero) ----
+vierte invitados / 2 en huevos.                 ~ division entera: 4
+espolvorea 1 a huevos.                          ~ huevos + 1 = 5
+vierte invitados * harina_por_persona en harina_total.   ~ 8 * 0,25 = 2,0
+espolvorea 0,5 a harina_total.                  ~ 2,5
+raspa 0,25 a harina_total.                      ~ 2,25
+vierte 3 en leche.                              ~ porciones -> tazas: 3,0
+vierte (leche + 1) * 2 - 0,5 en leche.          ~ parentesis y precedencia: 7,5
+espolvorea ", Maria" a dedicatoria.             ~ une textos
+vierte dorado en horneado.
+
+~ ---- Regla 3: tipos de dato ----
+molde porciones tazas_redondeadas con rebanar(harina_total).   ~ corta decimales: 2
+molde porciones temperatura con -(huevos * 2) + 190.             ~ signo negativo: 180
+molde betun tipo_de_leche con degustar(leche).                   ~ "tazas"
+
+~ ---- Servir (mostrar en pantalla) ----
+sirve dedicatoria.
+sirve inicial.
+sirve huevos.
+sirve harina_total.
+sirve leche.
+sirve tazas_redondeadas.
+sirve temperatura.
+sirve horneado.
+sirve tipo_de_leche.
+sirve degustar(inicial).
+sirve degustar(horneado).
+sirve degustar(dedicatoria).
+sirve degustar(invitados).

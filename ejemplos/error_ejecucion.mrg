@@ -1,0 +1,8 @@
+~ Error en EJECUCION: el compilador no puede saber de antemano que
+~ 'personas' valdra 0, asi que el error aparece al hornear.
+molde porciones galletas con 24.
+molde porciones personas con 3.
+raspa 3 a personas.                    ~ ahora personas vale 0
+sirve galletas.
+sirve galletas / personas.             ~ division entre cero al ejecutar
+sirve "esta linea ya no se ejecuta".

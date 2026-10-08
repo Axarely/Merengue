@@ -1,0 +1,8 @@
+~ Errores SINTACTICOS: las palabras existen, pero el orden no sigue la gramatica
+molde porciones huevos con 3           ~ falta el punto final
+molde tazas harina con 2,5.
+vierte en harina 5.                    ~ el valor va antes de 'en'
+molde porciones con 4.                 ~ falta el nombre del molde
+espolvorea 2 en huevos.                ~ espolvorea usa 'a', no 'en'
+sirve (harina + 2.                     ~ falta cerrar el parentesis
+molde betun mensaje con "hola".        ~ esta linea esta bien

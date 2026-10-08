@@ -1,0 +1,5 @@
+24
+  [línea 7] Error de ejecución: No se puede repartir entre cero: división entre 0.
+
+La receta se quemó: la ejecución se detuvo.
+codigo de salida: 1

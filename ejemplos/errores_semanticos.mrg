@@ -1,0 +1,18 @@
+~ Errores SEMANTICOS: la gramatica esta bien, pero el significado no
+molde secreto porciones huevos con 3.
+molde tazas harina con 2,5.
+molde betun mensaje con "Hola".
+molde punto listo con crudo.
+
+vierte azucar en harina.               ~ 'azucar' no fue declarado
+molde tazas harina con 1,0.            ~ 'harina' ya existe
+vierte 5 en huevos.                    ~ huevos es secreto (constante)
+molde porciones tandas con harina.     ~ tazas no entra en porciones
+vierte "chocolate" + 2 en mensaje.     ~ no se puede sumar betun y porciones
+raspa 1 a mensaje.                     ~ raspa no funciona con betun
+espolvorea 'x' a mensaje.              ~ a un betun solo se le espolvorea betun
+vierte 1 en listo.                     ~ punto solo acepta dorado o crudo
+molde secreto tazas azucar.            ~ un secreto necesita 'con'
+molde porciones mitad con 10 / 0.      ~ division entre cero
+molde porciones contador con contador + 1.  ~ se usa antes de existir
+molde porciones uno con 1. molde porciones dos con 2.  ~ un solo molde por linea

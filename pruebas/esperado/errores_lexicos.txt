@@ -1,0 +1,9 @@
+  [línea 2] Error léxico: 'azúcar': los nombres y palabras de Merengue no llevan tildes ni ñ
+  [línea 3] Error léxico: '2.5': en Merengue los decimales se escriben con coma, por ejemplo 2,5
+  [línea 4] Error léxico: '2capas': un nombre debe empezar con una letra
+  [línea 5] Error léxico: 'AB': una chispa lleva un solo carácter; para texto usa betun con comillas dobles
+  [línea 6] Error léxico: ';' no se usa en Merengue: las instrucciones terminan con punto '.'
+  [línea 7] Error léxico: carácter no válido '@'
+
+Compilación detenida: corrige los errores léxicos y sintácticos.
+codigo de salida: 1

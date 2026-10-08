@@ -1,0 +1,8 @@
+  [línea 2] Error sintáctico: falta el punto '.' al final de la instrucción
+  [línea 4] Error sintáctico: no se esperaba 'en'; se esperaba un valor (número, texto, molde, dorado/crudo...)
+  [línea 5] Error sintáctico: no se esperaba 'con'; se esperaba nombre de molde
+  [línea 6] Error sintáctico: no se esperaba 'en'; se esperaba 'a', '+', '-', '*' o '/'
+  [línea 7] Error sintáctico: no se esperaba '.'; se esperaba '+', '-', '*', '/' o ')'
+
+Compilación detenida: corrige los errores léxicos y sintácticos.
+codigo de salida: 1

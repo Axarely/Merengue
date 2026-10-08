@@ -1,0 +1,15 @@
+  [línea 7] Error semántico: Ese molde no está en la mesa: 'azucar' no fue declarado (declara primero con: molde <tipo> azucar.)
+  [línea 8] Error semántico: Ese molde ya existe: 'harina' ya fue preparado en la línea 3.
+  [línea 9] Error semántico: No se puede cambiar la receta secreta: 'huevos' es un molde secreto (constante).
+  [línea 10] Error semántico: La mezcla se cortó: 'tandas' es porciones y no acepta tazas (se perderían los decimales). Usa rebanar(...) para cortar los decimales.
+  [línea 11] Error semántico: La mezcla se cortó: no se puede usar '+' entre betun y porciones (los operadores solo funcionan con porciones y tazas).
+  [línea 12] Error semántico: raspa solo funciona con porciones y tazas; 'mensaje' es betun.
+  [línea 13] Error semántico: La mezcla se cortó: a un betun solo se le puede espolvorear otro betun (texto), no chispa.
+  [línea 14] Error semántico: La mezcla se cortó: 'listo' es punto y no acepta un valor de tipo porciones.
+  [línea 15] Error semántico: El molde secreto 'azucar' necesita su valor en la misma línea: molde secreto tazas azucar con <valor>.
+  [línea 16] Error semántico: No se puede repartir entre cero: división entre 0.
+  [línea 17] Error semántico: Ese molde no está en la mesa: 'contador' no fue declarado (declara primero con: molde <tipo> contador.)
+  [línea 18] Error semántico: Se declara un solo molde por línea: 'dos' debe ir en su propia línea.
+
+Compilación detenida: la mezcla tiene errores semánticos.
+codigo de salida: 1

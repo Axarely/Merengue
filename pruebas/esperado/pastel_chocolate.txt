@@ -1,0 +1,14 @@
+Feliz cumple, Maria
+M
+5
+2,25
+7,5
+2
+180
+dorado
+tazas
+chispa
+punto
+betun
+porciones
+codigo de salida: 0
