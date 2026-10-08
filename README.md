@@ -127,6 +127,16 @@ make
 
 **Windows con MSYS2:** abre la terminal *MSYS2 UCRT64*, instala con `pacman -S make gcc flex bison` y usa los mismos comandos. Si ves símbolos raros en lugar de tildes, ejecuta antes `chcp 65001`.
 
+### En Visual Studio Code
+
+El repositorio incluye la carpeta `.vscode` con tareas listas:
+
+- `Ctrl+Shift+B` compila el proyecto.
+- Con una receta `.mrg` abierta, ve a **Terminal → Run Task...** y elige **Merengue: ejecutar la receta abierta**.
+- **Merengue: correr todas las pruebas** corre todos los ejemplos.
+
+En Windows, abre la carpeta desde WSL (`code .` dentro de la terminal de Ubuntu) para que `make`, `flex` y `bison` funcionen.
+
 ### Opciones
 
 | Comando | Qué muestra |
