@@ -9,6 +9,17 @@
 
 static TablaSimbolos *mesa;
 
+/* Resultado de ejecutar una lista de instrucciones. */
+typedef enum { EJ_ERROR = 0, EJ_OK = 1, EJ_ENTREGA = 2 } Resultado;
+
+static Resultado ejecutar_instrucciones(Nodo *const *instrucciones, int cantidad,
+                                        Valor *entregado);
+static int llamar_preparacion(const Nodo *llamada, Valor *salida);
+
+/* Limite de preparaciones abiertas a la vez (una dentro de otra). */
+#define PROFUNDIDAD_MAXIMA 200
+static int profundidad;
+
 /* Convierte un valor al tipo del molde (unica conversion: porciones -> tazas). */
 static Valor convertir(Valor valor, TipoDato destino) {
   if (destino == TIPO_TAZAS && valor.tipo == TIPO_PORCIONES) {
@@ -48,12 +59,13 @@ static int evaluar(const Nodo *nodo, Valor *salida) {
     case TIPO_BETUN: salida->betun = copiar_texto(nodo->valor.betun); break;
     case TIPO_CHISPA: salida->chispa = nodo->valor.chispa; break;
     case TIPO_PUNTO: salida->punto = nodo->valor.punto; break;
+    case TIPO_NADA:
     case TIPO_DESCONOCIDO: return 0;
     }
     return 1;
 
   case NODO_IDENTIFICADOR: {
-    Simbolo *simbolo = tabla_buscar(mesa, nodo->nombre);
+    Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
     if (simbolo == NULL) return 0;
     *salida = simbolo->valor;
     if (salida->tipo == TIPO_BETUN) {
@@ -138,20 +150,24 @@ static int evaluar(const Nodo *nodo, Valor *salida) {
     return 1;
   }
 
-  case NODO_RECETA:
-  case NODO_DECLARACION:
-  case NODO_ASIGNACION:
-  case NODO_SIRVE:
+  case NODO_LLAMADA:
+    return llamar_preparacion(nodo, salida);
+
+  default:
     break;
   }
   return 0;
 }
 
 static int ejecutar_declaracion(const Nodo *nodo) {
-  Simbolo *simbolo = tabla_buscar(mesa, nodo->nombre);
+  Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
   if (simbolo == NULL) return 0;
   if (nodo->num_hijos == 0) {
-    return 1; /* se queda con su valor por defecto */
+    /* Valor por defecto (se reinicia en cada llamada a una preparacion). */
+    Valor defecto = valor_por_defecto(simbolo->tipo);
+    valor_asignar(&simbolo->valor, &defecto);
+    valor_liberar(&defecto);
+    return 1;
   }
   Valor valor;
   if (!evaluar(nodo->hijos[0], &valor)) return 0;
@@ -162,7 +178,7 @@ static int ejecutar_declaracion(const Nodo *nodo) {
 }
 
 static int ejecutar_asignacion(const Nodo *nodo) {
-  Simbolo *simbolo = tabla_buscar(mesa, nodo->nombre);
+  Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
   if (simbolo == NULL) return 0;
 
   Valor valor;
@@ -234,21 +250,115 @@ static int ejecutar_sirve(const Nodo *nodo) {
   return 1;
 }
 
-int hornear_receta(const Nodo *receta, TablaSimbolos *tabla) {
-  mesa = tabla;
-  for (int i = 0; i < receta->num_hijos; i++) {
-    const Nodo *instruccion = receta->hijos[i];
+/* ------------------------------------------------------------------ */
+/* Preparaciones (Regla 4)                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Llama a una preparacion:
+ *   1. calcula los argumentos (en el ambito de quien llama),
+ *   2. los copia en los ingredientes,
+ *   3. ejecuta los pasos hasta 'entrega' o 'fin',
+ *   4. devuelve el valor entregado.
+ */
+static int llamar_preparacion(const Nodo *llamada, Valor *salida) {
+  const Simbolo *preparacion = tabla_simbolo(mesa, llamada->simbolo);
+  if (preparacion == NULL) return 0;
+  const Nodo *definicion = preparacion->definicion;
+  const Nodo *ingredientes = definicion->hijos[0];
+  const Nodo *pasos = definicion->hijos[1];
+
+  if (profundidad >= PROFUNDIDAD_MAXIMA) {
+    reportar_error(FASE_EJECUCION, llamada->linea,
+                   "demasiadas preparaciones abiertas una dentro de otra.");
+    return 0;
+  }
+
+  /* 1. Argumentos */
+  int cantidad = llamada->num_hijos;
+  Valor argumentos[64];
+  for (int i = 0; i < cantidad && i < 64; i++) {
+    if (!evaluar(llamada->hijos[i], &argumentos[i])) {
+      for (int j = 0; j < i; j++) valor_liberar(&argumentos[j]);
+      return 0;
+    }
+  }
+
+  /* 2. Ingredientes */
+  for (int i = 0; i < cantidad && i < 64; i++) {
+    const Nodo *ingrediente = ingredientes->hijos[i];
+    Simbolo *simbolo = tabla_simbolo(mesa, ingrediente->simbolo);
+    Valor convertido = convertir(argumentos[i], ingrediente->tipo_declarado);
+    valor_asignar(&simbolo->valor, &convertido);
+    valor_liberar(&argumentos[i]);
+  }
+
+  /* 3. Pasos */
+  Valor entregado;
+  memset(&entregado, 0, sizeof(entregado));
+  entregado.tipo = TIPO_NADA;
+  profundidad++;
+  Resultado resultado =
+      ejecutar_instrucciones(pasos->hijos, pasos->num_hijos, &entregado);
+  profundidad--;
+  if (resultado == EJ_ERROR) {
+    valor_liberar(&entregado);
+    return 0;
+  }
+
+  /* 4. Valor entregado */
+  *salida = convertir(entregado, preparacion->tipo);
+  return 1;
+}
+
+static int ejecutar_entrega(const Nodo *nodo, Valor *entregado) {
+  if (nodo->num_hijos == 0) {
+    entregado->tipo = TIPO_NADA;
+    return 1;
+  }
+  return evaluar(nodo->hijos[0], entregado);
+}
+
+static Resultado ejecutar_instrucciones(Nodo *const *instrucciones, int cantidad,
+                                        Valor *entregado) {
+  for (int i = 0; i < cantidad; i++) {
+    const Nodo *instruccion = instrucciones[i];
     int ok = 1;
     switch (instruccion->clase) {
     case NODO_DECLARACION: ok = ejecutar_declaracion(instruccion); break;
     case NODO_ASIGNACION: ok = ejecutar_asignacion(instruccion); break;
     case NODO_SIRVE: ok = ejecutar_sirve(instruccion); break;
-    default: break;
+    case NODO_LLAMADA: {
+      /* Llamada sola como instruccion: el valor (si hay) se descarta. */
+      Valor descartado;
+      ok = llamar_preparacion(instruccion, &descartado);
+      if (ok) valor_liberar(&descartado);
+      break;
+    }
+    case NODO_ENTREGA:
+      if (!ejecutar_entrega(instruccion, entregado)) return EJ_ERROR;
+      return EJ_ENTREGA;
+    case NODO_PREPARACION:
+      /* Solo es la definicion: se ejecuta cuando alguien la llama. */
+      break;
+    default:
+      break;
     }
     if (!ok) {
-      return 0;
+      return EJ_ERROR;
     }
   }
+  return EJ_OK;
+}
+
+int hornear_receta(const Nodo *receta, TablaSimbolos *tabla) {
+  mesa = tabla;
+  profundidad = 0;
+  Valor sin_uso;
+  memset(&sin_uso, 0, sizeof(sin_uso));
+  Resultado resultado =
+      ejecutar_instrucciones(receta->hijos, receta->num_hijos, &sin_uso);
+  valor_liberar(&sin_uso);
   fflush(stdout);
-  return 1;
+  return resultado != EJ_ERROR;
 }

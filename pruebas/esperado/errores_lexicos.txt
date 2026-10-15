@@ -4,6 +4,7 @@
   [línea 5] Error léxico: 'AB': una chispa lleva un solo carácter; para texto usa betun con comillas dobles
   [línea 6] Error léxico: ';' no se usa en Merengue: las instrucciones terminan con punto '.'
   [línea 7] Error léxico: carácter no válido '@'
+  [línea 8] Error léxico: ',' sola no se usa en Merengue (la coma es para decimales como 2,5): los ingredientes se separan con 'y'
 
 Compilación detenida: corrige los errores léxicos y sintácticos.
 codigo de salida: 1

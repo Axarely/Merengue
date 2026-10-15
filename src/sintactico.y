@@ -11,6 +11,11 @@
  *   receta       -> instrucciones
  *   instrucciones-> instrucciones instruccion | (vacio)
  *   instruccion  -> declaracion '.' | asignacion '.' | salida '.'
+ *                 | preparacion | llamada '.' | entrega '.'
+ *   preparacion  -> preparacion NOMBRE ( ingredientes ) rinde TIPO|nada : pasos fin .
+ *   ingredientes -> TIPO NOMBRE (y TIPO NOMBRE)*  | (vacio)
+ *   llamada      -> NOMBRE ( argumentos )      argumentos -> expresion (y expresion)*
+ *   entrega      -> entrega expresion | entrega
  *   declaracion  -> molde [secreto] TIPO NOMBRE [con expresion]
  *   asignacion   -> vierte expresion en NOMBRE
  *                 | espolvorea expresion a NOMBRE
@@ -18,7 +23,7 @@
  *   salida       -> sirve expresion
  *   expresion    -> expresion (+ - * /) expresion | - expresion
  *                 | ( expresion ) | degustar ( expresion )
- *                 | rebanar ( expresion ) | NOMBRE | literal
+ *                 | rebanar ( expresion ) | llamada | NOMBRE | literal
  */
 
 %code requires {
@@ -41,6 +46,10 @@ extern int linea_token_anterior;
 
 /* Raiz del AST: la usa main.c cuando termina el analisis. */
 Nodo *raiz_ast = NULL;
+
+/* Preparaciones abiertas (para avisar si falta 'fin.'). */
+static int preparaciones_abiertas = 0;
+static int linea_preparacion_abierta = 0;
 %}
 
 %locations
@@ -66,6 +75,12 @@ Nodo *raiz_ast = NULL;
 %token T_SIRVE "sirve"
 %token T_DEGUSTAR "degustar"
 %token T_REBANAR "rebanar"
+%token T_PREPARACION "preparacion"
+%token T_RINDE "rinde"
+%token T_NADA "nada"
+%token T_ENTREGA "entrega"
+%token T_FIN "fin"
+%token T_Y "y"
 
 %token <texto>    T_TIPO          "tipo de dato"
 %token <texto>    T_ID            "nombre de molde"
@@ -76,6 +91,9 @@ Nodo *raiz_ast = NULL;
 %token <entero>   T_LIT_PUNTO     "dorado o crudo"
 
 %type <nodo> instrucciones instruccion declaracion asignacion salida expresion
+%type <nodo> preparacion ingredientes lista_ingredientes ingrediente pasos
+%type <nodo> llamada argumentos lista_argumentos entrega
+%type <entero> tipo_que_rinde
 
 /* Precedencia: de menor a mayor. */
 %left '+' '-'
@@ -103,6 +121,9 @@ instruccion
     : declaracion '.'               { $$ = $1; }
     | asignacion '.'                { $$ = $1; }
     | salida '.'                    { $$ = $1; }
+    | preparacion                   { $$ = $1; }
+    | llamada '.'                   { $$ = $1; /* p. ej.  decorar("Ana"). */ }
+    | entrega '.'                   { $$ = $1; }
     | error '.'                     { $$ = NULL; yyerrok; /* sigue con la siguiente instruccion */ }
     ;
 
@@ -135,6 +156,60 @@ salida
     : T_SIRVE expresion             { $$ = nodo_sirve(@1.first_line, $2); }
     ;
 
+/* ---------- Preparaciones (funciones) ---------- */
+
+preparacion
+    : T_PREPARACION T_ID '(' ingredientes ')' T_RINDE tipo_que_rinde ':'
+        { if (preparaciones_abiertas++ == 0) linea_preparacion_abierta = @1.first_line; }
+      pasos T_FIN '.'
+        { preparaciones_abiertas--;
+          $$ = nodo_preparacion(@1.first_line, $2, $4, (TipoDato)$7, $10); free($2); }
+    ;
+
+tipo_que_rinde
+    : T_TIPO                        { $$ = tipo_desde_texto($1); free($1); }
+    | T_NADA                        { $$ = TIPO_NADA; }
+    ;
+
+ingredientes
+    : %empty                        { $$ = nodo_ingredientes(yylloc.first_line); }
+    | lista_ingredientes            { $$ = $1; }
+    ;
+
+lista_ingredientes
+    : ingrediente                   { $$ = nodo_ingredientes(@1.first_line); nodo_agregar_hijo($$, $1); }
+    | lista_ingredientes T_Y ingrediente { $$ = $1; nodo_agregar_hijo($$, $3); }
+    ;
+
+ingrediente
+    : T_TIPO T_ID
+        { $$ = nodo_ingrediente(@1.first_line, tipo_desde_texto($1), $2); free($1); free($2); }
+    ;
+
+pasos
+    : %empty                        { $$ = nodo_pasos(yylloc.first_line); }
+    | pasos instruccion             { $$ = $1; nodo_agregar_hijo($$, $2); }
+    ;
+
+entrega
+    : T_ENTREGA expresion           { $$ = nodo_entrega(@1.first_line, $2); }
+    | T_ENTREGA                     { $$ = nodo_entrega(@1.first_line, NULL); }
+    ;
+
+llamada
+    : T_ID '(' argumentos ')'       { $$ = nodo_llamada(@1.first_line, $1, $3); free($1); }
+    ;
+
+argumentos
+    : %empty                        { $$ = NULL; }
+    | lista_argumentos              { $$ = $1; }
+    ;
+
+lista_argumentos
+    : expresion                     { $$ = nodo_lista_temporal(); nodo_agregar_hijo($$, $1); }
+    | lista_argumentos T_Y expresion { $$ = $1; nodo_agregar_hijo($$, $3); }
+    ;
+
 expresion
     : expresion '+' expresion       { $$ = nodo_operacion(@2.first_line, '+', $1, $3); }
     | expresion '-' expresion       { $$ = nodo_operacion(@2.first_line, '-', $1, $3); }
@@ -144,6 +219,7 @@ expresion
     | '(' expresion ')'             { $$ = $2; /* los parentesis no crean nodo */ }
     | T_DEGUSTAR '(' expresion ')'  { $$ = nodo_funcion(@1.first_line, FUNC_DEGUSTAR, $3); }
     | T_REBANAR '(' expresion ')'   { $$ = nodo_funcion(@1.first_line, FUNC_REBANAR, $3); }
+    | llamada                       { $$ = $1; }
     | T_ID                          { $$ = nodo_identificador(@1.first_line, $1); free($1); }
     | T_LIT_PORCIONES               { $$ = nodo_literal_porciones(@1.first_line, $1); }
     | T_LIT_TAZAS                   { $$ = nodo_literal_tazas(@1.first_line, $1); }
@@ -209,6 +285,20 @@ static int yyreport_syntax_error(const yypcontext_t *contexto) {
     /* El caso mas comun: se olvido el punto al final de la linea anterior. */
     reportar_error(FASE_SINTACTICA, linea_token_anterior,
                    "falta el punto '.' al final de la instrucción");
+    return 0;
+  }
+
+  if (encontrado == YYSYMBOL_YYEOF && preparaciones_abiertas > 0) {
+    reportar_error(FASE_SINTACTICA, linea_token_anterior,
+                   "falta 'fin.' para cerrar la preparación que empieza en la "
+                   "línea %d",
+                   linea_preparacion_abierta);
+    return 0;
+  }
+  if (encontrado == YYSYMBOL_T_FIN && preparaciones_abiertas == 0) {
+    reportar_error(FASE_SINTACTICA, linea,
+                   "sobra 'fin': no hay ninguna preparación abierta "
+                   "(revisa el encabezado de la preparación)");
     return 0;
   }
 

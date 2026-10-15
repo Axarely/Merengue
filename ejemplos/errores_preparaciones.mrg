@@ -1,0 +1,34 @@
+~ Errores SEMANTICOS de las preparaciones (funciones)
+preparacion masa(porciones huevos y tazas harina) rinde tazas:
+    molde tazas mezcla con harina * 2.
+    entrega mezcla.
+fin.
+
+preparacion decorar(betun nombre) rinde nada:
+    sirve nombre.
+fin.
+
+preparacion sin_entrega(porciones x) rinde porciones:   ~ rinde porciones pero no entrega
+    sirve x.
+fin.
+
+preparacion entrega_mal() rinde porciones:
+    entrega 2,5.                                       ~ tazas no entra en porciones
+fin.
+
+preparacion repetida(porciones c y tazas c) rinde nada:   ~ ingrediente repetido
+    sirve c.
+fin.
+
+preparacion eco(porciones n) rinde porciones:
+    entrega eco(n).                                    ~ no puede usarse a si misma
+fin.
+
+molde tazas t1 con masa(3).                ~ faltan ingredientes
+molde tazas t2 con masa("tres" y 2,5).     ~ el ingrediente 1 es porciones
+molde porciones t3 con masa(3 y 2,5).      ~ masa rinde tazas
+molde betun b con decorar("Ana").          ~ decorar rinde nada
+sirve mezcla.                              ~ mezcla es local de masa
+glaseado(2).                               ~ no existe
+sirve masa.                                ~ masa es una preparacion, no un molde
+entrega 5.                                 ~ entrega fuera de una preparacion

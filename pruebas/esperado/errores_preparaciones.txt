@@ -1,0 +1,15 @@
+  [línea 11] Error semántico: La preparación 'sin_entrega' rinde porciones pero nunca entrega nada (falta  entrega <valor>.).
+  [línea 16] Error semántico: La mezcla se cortó: 'entrega_mal' rinde porciones y se quiere entregar tazas. Usa rebanar(...).
+  [línea 19] Error semántico: El ingrediente 'c' está repetido en 'repetida'.
+  [línea 24] Error semántico: La preparación 'eco' no puede usarse a sí misma.
+  [línea 27] Error semántico: La preparación 'masa' lleva 2 ingredientes y se le dieron 1.
+  [línea 28] Error semántico: La mezcla se cortó: el ingrediente 1 de 'masa' (huevos) es porciones y se le dio betun.
+  [línea 29] Error semántico: La mezcla se cortó: 't3' es porciones y no acepta tazas (se perderían los decimales). Usa rebanar(...) para cortar los decimales.
+  [línea 30] Error semántico: La preparación 'decorar' rinde nada: no se puede usar como valor.
+  [línea 31] Error semántico: Ese molde no está en la mesa: 'mezcla' no fue declarado (declara primero con: molde <tipo> mezcla.)
+  [línea 32] Error semántico: Esa preparación no está en el recetario: 'glaseado' no fue declarada (declárala antes con: preparacion glaseado(...) rinde <tipo>: ... fin.)
+  [línea 33] Error semántico: 'masa' es una preparación: para usarla escribe masa(...).
+  [línea 34] Error semántico: 'entrega' solo se usa dentro de una preparación.
+
+Compilación detenida: la mezcla tiene errores semánticos.
+codigo de salida: 1

@@ -6,3 +6,6 @@ molde porciones con 4.                 ~ falta el nombre del molde
 espolvorea 2 en huevos.                ~ espolvorea usa 'a', no 'en'
 sirve (harina + 2.                     ~ falta cerrar el parentesis
 molde betun mensaje con "hola".        ~ esta linea esta bien
+preparacion galleta(porciones n) tazas:     ~ falta 'rinde' antes del tipo
+    entrega n.
+fin.

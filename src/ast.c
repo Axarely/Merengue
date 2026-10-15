@@ -18,6 +18,7 @@ static Nodo *nodo_nuevo(TipoNodo clase, int linea) {
   nodo->clase = clase;
   nodo->linea = linea;
   nodo->tipo_dato = TIPO_DESCONOCIDO;
+  nodo->simbolo = -1;
   return nodo;
 }
 
@@ -128,6 +129,52 @@ Nodo *nodo_funcion(int linea, TipoFuncion funcion, Nodo *argumento) {
   return nodo;
 }
 
+Nodo *nodo_preparacion(int linea, const char *nombre, Nodo *ingredientes,
+                       TipoDato rinde, Nodo *pasos) {
+  Nodo *nodo = nodo_nuevo(NODO_PREPARACION, linea);
+  nodo->nombre = copiar_texto(nombre);
+  nodo->tipo_declarado = rinde;
+  nodo->tipo_dato = rinde;
+  nodo_agregar_hijo(nodo, ingredientes);
+  nodo_agregar_hijo(nodo, pasos);
+  return nodo;
+}
+
+Nodo *nodo_ingredientes(int linea) { return nodo_nuevo(NODO_INGREDIENTES, linea); }
+
+Nodo *nodo_ingrediente(int linea, TipoDato tipo, const char *nombre) {
+  Nodo *nodo = nodo_nuevo(NODO_INGREDIENTE, linea);
+  nodo->tipo_declarado = tipo;
+  nodo->tipo_dato = tipo;
+  nodo->nombre = copiar_texto(nombre);
+  return nodo;
+}
+
+Nodo *nodo_pasos(int linea) { return nodo_nuevo(NODO_PASOS, linea); }
+
+Nodo *nodo_entrega(int linea, Nodo *valor) {
+  Nodo *nodo = nodo_nuevo(NODO_ENTREGA, linea);
+  nodo_agregar_hijo(nodo, valor);
+  return nodo;
+}
+
+Nodo *nodo_lista_temporal(void) { return nodo_nuevo(NODO_PASOS, 0); }
+
+Nodo *nodo_llamada(int linea, const char *nombre, Nodo *argumentos) {
+  Nodo *nodo = nodo_nuevo(NODO_LLAMADA, linea);
+  nodo->nombre = copiar_texto(nombre);
+  if (argumentos != NULL) {
+    /* Los argumentos pasan a ser hijos directos de la llamada. */
+    nodo->hijos = argumentos->hijos;
+    nodo->num_hijos = argumentos->num_hijos;
+    nodo->capacidad = argumentos->capacidad;
+    argumentos->hijos = NULL;
+    argumentos->num_hijos = argumentos->capacidad = 0;
+    ast_liberar(argumentos);
+  }
+  return nodo;
+}
+
 /* ------------------------------------------------------------------ */
 /* Descripcion de nodos                                                */
 /* ------------------------------------------------------------------ */
@@ -143,6 +190,12 @@ const char *ast_nombre_clase(TipoNodo clase) {
   case NODO_OPERACION: return "Operación";
   case NODO_NEGATIVO: return "Negativo";
   case NODO_FUNCION: return "Función";
+  case NODO_PREPARACION: return "Preparación";
+  case NODO_INGREDIENTES: return "Ingredientes";
+  case NODO_INGREDIENTE: return "Ingrediente";
+  case NODO_PASOS: return "Pasos";
+  case NODO_ENTREGA: return "Entrega";
+  case NODO_LLAMADA: return "Llamada";
   }
   return "?";
 }
@@ -179,6 +232,7 @@ static void describir_literal(const Nodo *nodo, char *destino, int tamano) {
   case TIPO_PUNTO:
     snprintf(destino, (size_t)tamano, "%s", nodo->valor.punto ? "dorado" : "crudo");
     break;
+  case TIPO_NADA:
   case TIPO_DESCONOCIDO:
     snprintf(destino, (size_t)tamano, "?");
     break;
@@ -189,7 +243,8 @@ static void describir_literal(const Nodo *nodo, char *destino, int tamano) {
 static void describir_detalle(const Nodo *nodo, char *destino, int tamano) {
   switch (nodo->clase) {
   case NODO_RECETA:
-    snprintf(destino, (size_t)tamano, "%d instrucciones", nodo->num_hijos);
+    snprintf(destino, (size_t)tamano, "%d instrucci%s", nodo->num_hijos,
+             nodo->num_hijos == 1 ? "ón" : "ones");
     break;
   case NODO_DECLARACION:
     snprintf(destino, (size_t)tamano, "molde %s%s %s",
@@ -219,6 +274,29 @@ static void describir_detalle(const Nodo *nodo, char *destino, int tamano) {
     snprintf(destino, (size_t)tamano, "%s()",
              nodo->funcion == FUNC_DEGUSTAR ? "degustar" : "rebanar");
     break;
+  case NODO_PREPARACION:
+    snprintf(destino, (size_t)tamano, "%s rinde %s", nodo->nombre,
+             tipo_nombre(nodo->tipo_declarado));
+    break;
+  case NODO_INGREDIENTES:
+    snprintf(destino, (size_t)tamano, "%d", nodo->num_hijos);
+    break;
+  case NODO_INGREDIENTE:
+    snprintf(destino, (size_t)tamano, "%s %s", tipo_nombre(nodo->tipo_declarado),
+             nodo->nombre);
+    break;
+  case NODO_PASOS:
+    snprintf(destino, (size_t)tamano, "%d instrucci%s", nodo->num_hijos,
+             nodo->num_hijos == 1 ? "ón" : "ones");
+    break;
+  case NODO_ENTREGA:
+    snprintf(destino, (size_t)tamano, "%s",
+             nodo->num_hijos > 0 ? "devuelve un valor" : "sin valor");
+    break;
+  case NODO_LLAMADA:
+    snprintf(destino, (size_t)tamano, "%s, %d argumento%s", nodo->nombre,
+             nodo->num_hijos, nodo->num_hijos == 1 ? "" : "s");
+    break;
   }
 }
 
@@ -232,7 +310,7 @@ void ast_describir(const Nodo *nodo, char *destino, int tamano) {
 static int es_expresion(const Nodo *nodo) {
   return nodo->clase == NODO_LITERAL || nodo->clase == NODO_IDENTIFICADOR ||
          nodo->clase == NODO_OPERACION || nodo->clase == NODO_NEGATIVO ||
-         nodo->clase == NODO_FUNCION;
+         nodo->clase == NODO_FUNCION || nodo->clase == NODO_LLAMADA;
 }
 
 /* ------------------------------------------------------------------ */
@@ -271,7 +349,8 @@ static void imprimir_rama(const Nodo *nodo, const char *prefijo, int es_ultimo,
     printf("  : %s", tipo_nombre(nodo->tipo_dato));
   }
   if (nodo->clase == NODO_DECLARACION || nodo->clase == NODO_ASIGNACION ||
-      nodo->clase == NODO_SIRVE) {
+      nodo->clase == NODO_SIRVE || nodo->clase == NODO_PREPARACION ||
+      nodo->clase == NODO_ENTREGA) {
     printf("   [línea %d]", nodo->linea);
   }
   printf("\n");
@@ -308,7 +387,8 @@ static void fila_ast(const Nodo *nodo, int id_padre) {
 
   snprintf(id, sizeof(id), "%d", nodo->id);
   describir_detalle(nodo, detalle, sizeof(detalle));
-  if (es_expresion(nodo) || nodo->clase == NODO_DECLARACION) {
+  if (es_expresion(nodo) || nodo->clase == NODO_DECLARACION ||
+      nodo->clase == NODO_INGREDIENTE || nodo->clase == NODO_PREPARACION) {
     snprintf(tipo, sizeof(tipo), "%s", tipo_nombre(nodo->tipo_dato));
   } else {
     snprintf(tipo, sizeof(tipo), "-");

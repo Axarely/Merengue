@@ -3,6 +3,8 @@
   [línea 5] Error sintáctico: no se esperaba 'con'; se esperaba nombre de molde
   [línea 6] Error sintáctico: no se esperaba 'en'; se esperaba 'a', '+', '-', '*' o '/'
   [línea 7] Error sintáctico: no se esperaba '.'; se esperaba '+', '-', '*', '/' o ')'
+  [línea 9] Error sintáctico: no se esperaba tipo de dato; se esperaba 'rinde'
+  [línea 11] Error sintáctico: sobra 'fin': no hay ninguna preparación abierta (revisa el encabezado de la preparación)
 
 Compilación detenida: corrige los errores léxicos y sintácticos.
 codigo de salida: 1

@@ -25,7 +25,15 @@ typedef enum {
   NODO_IDENTIFICADOR, /* uso de un molde dentro de una expresion     */
   NODO_OPERACION,     /* expr + expr, expr - expr, expr * expr ...   */
   NODO_NEGATIVO,      /* -expr                                       */
-  NODO_FUNCION        /* degustar(expr)  rebanar(expr)               */
+  NODO_FUNCION,       /* degustar(expr)  rebanar(expr)               */
+
+  /* Preparaciones (funciones del usuario) */
+  NODO_PREPARACION,   /* preparacion nombre(...) rinde tipo: ... fin. */
+  NODO_INGREDIENTES,  /* lista de parametros de una preparacion       */
+  NODO_INGREDIENTE,   /* un parametro: <tipo> <nombre>                */
+  NODO_PASOS,         /* cuerpo de una preparacion                    */
+  NODO_ENTREGA,       /* entrega expr.   /   entrega.                 */
+  NODO_LLAMADA        /* nombre(arg y arg ...)                        */
 } TipoNodo;
 
 typedef enum { ASIG_VIERTE, ASIG_ESPOLVOREA, ASIG_RASPA } TipoAsignacion;
@@ -45,7 +53,8 @@ typedef struct Nodo {
   char *nombre;
 
   /* Datos propios de cada clase de nodo. */
-  TipoDato tipo_declarado; /* NODO_DECLARACION */
+  TipoDato tipo_declarado; /* NODO_DECLARACION, NODO_INGREDIENTE, y en
+                              NODO_PREPARACION el tipo que rinde */
   int es_secreto;          /* NODO_DECLARACION */
   TipoAsignacion asignacion;
   char operador;           /* '+', '-', '*', '/' en NODO_OPERACION */
@@ -59,6 +68,10 @@ typedef struct Nodo {
     char chispa;
     int punto;
   } valor;
+
+  /* Posicion en la tabla de simbolos del molde, ingrediente o preparacion
+     al que se refiere este nodo (la pone el semantico; -1 = ninguno). */
+  int simbolo;
 
   /* Hijos en orden (lista dinamica). */
   struct Nodo **hijos;
@@ -82,6 +95,18 @@ Nodo *nodo_identificador(int linea, const char *nombre);
 Nodo *nodo_operacion(int linea, char operador, Nodo *izquierda, Nodo *derecha);
 Nodo *nodo_negativo(int linea, Nodo *expresion);
 Nodo *nodo_funcion(int linea, TipoFuncion funcion, Nodo *argumento);
+
+/* Preparaciones. Una preparacion tiene dos hijos: Ingredientes y Pasos. */
+Nodo *nodo_preparacion(int linea, const char *nombre, Nodo *ingredientes,
+                       TipoDato rinde, Nodo *pasos);
+Nodo *nodo_ingredientes(int linea);
+Nodo *nodo_ingrediente(int linea, TipoDato tipo, const char *nombre);
+Nodo *nodo_pasos(int linea);
+Nodo *nodo_entrega(int linea, Nodo *valor); /* valor puede ser NULL */
+Nodo *nodo_llamada(int linea, const char *nombre, Nodo *argumentos);
+/* La lista de argumentos se arma en un nodo temporal; nodo_llamada toma
+   sus hijos y lo libera. */
+Nodo *nodo_lista_temporal(void);
 
 void nodo_agregar_hijo(Nodo *padre, Nodo *hijo);
 

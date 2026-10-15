@@ -1,8 +1,15 @@
 /*
  * tabla_simbolos.h - Tabla de Simbolos de Merengue ("la mesa de moldes").
  *
- * Cada molde declarado ocupa un renglon con su nombre, tipo, si es
- * secreto (constante), la linea donde se declaro y cuantas veces se usa.
+ * Cada nombre declarado ocupa un renglon: moldes, moldes secretos,
+ * ingredientes (parametros) y preparaciones (funciones). Cada renglon
+ * dice en que AMBITO vive:
+ *   - "global": declarado en la receta principal,
+ *   - el nombre de una preparacion: declarado dentro de ella.
+ *
+ * Al salir de una preparacion sus nombres quedan INACTIVOS: ya no se
+ * pueden usar, pero siguen en la tabla para mostrarlos al final.
+ *
  * La llena el analizador semantico y la usa el interprete para guardar
  * el valor de cada molde mientras corre la receta.
  */
@@ -20,14 +27,26 @@ typedef struct {
   int punto;
 } Valor;
 
+typedef enum {
+  CAT_MOLDE,       /* variable                        */
+  CAT_SECRETO,     /* constante                       */
+  CAT_INGREDIENTE, /* parametro de una preparacion    */
+  CAT_PREPARACION  /* funcion                         */
+} Categoria;
+
 typedef struct {
   char *nombre;
-  TipoDato tipo;
-  int es_secreto;
+  TipoDato tipo;           /* en una preparacion: el tipo que rinde */
+  Categoria categoria;
+  char *ambito;            /* "global" o el nombre de la preparacion */
+  int nivel;               /* 0 = global, 1 = dentro de una preparacion */
+  int activo;              /* 0 cuando ya se salio de su ambito */
   int linea_declaracion;
   int tiene_valor_inicial; /* 1 si se declaro con 'con' */
-  int usos;                /* veces que se lee dentro de una expresion */
+  int usos;                /* lecturas (o llamadas, si es preparacion) */
   int modificaciones;      /* veces que recibe vierte/espolvorea/raspa */
+  int num_ingredientes;    /* solo preparaciones */
+  const void *definicion;  /* solo preparaciones: su nodo del AST */
   Valor valor;             /* valor durante la ejecucion */
 } Simbolo;
 
@@ -35,15 +54,34 @@ typedef struct {
   Simbolo *simbolos;
   int cantidad;
   int capacidad;
+  int nivel_actual;
+  char *ambito_actual;
 } TablaSimbolos;
 
 void tabla_iniciar(TablaSimbolos *tabla);
 
-/* Devuelve el simbolo nuevo, o NULL si el nombre ya existia. */
-Simbolo *tabla_insertar(TablaSimbolos *tabla, const char *nombre, TipoDato tipo,
-                        int es_secreto, int linea, int tiene_valor_inicial);
+/* Entra a una preparacion / sale de ella. */
+void tabla_entrar_ambito(TablaSimbolos *tabla, const char *nombre_preparacion);
+void tabla_salir_ambito(TablaSimbolos *tabla);
 
-Simbolo *tabla_buscar(TablaSimbolos *tabla, const char *nombre);
+/* Agrega un nombre al ambito actual. Devuelve su posicion, o -1 si ya
+   existia en ese mismo ambito. */
+int tabla_insertar(TablaSimbolos *tabla, const char *nombre, TipoDato tipo,
+                   Categoria categoria, int linea, int tiene_valor_inicial);
+
+/* Busca un nombre visible: primero en el ambito actual y luego en el
+   global. Devuelve su posicion o -1. */
+int tabla_buscar(const TablaSimbolos *tabla, const char *nombre);
+
+/* Busca solo en el ambito global. */
+int tabla_buscar_global(const TablaSimbolos *tabla, const char *nombre);
+
+/* Busca solo en el ambito actual. */
+int tabla_buscar_local(const TablaSimbolos *tabla, const char *nombre);
+
+Simbolo *tabla_simbolo(TablaSimbolos *tabla, int posicion);
+
+const char *categoria_nombre(Categoria categoria);
 
 /* Imprime la tabla. Si con_valores es 1 agrega la columna "Valor final". */
 void tabla_imprimir(const TablaSimbolos *tabla, int con_valores);

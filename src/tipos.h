@@ -6,6 +6,9 @@
  *   betun     -> texto              (como char[] en C)
  *   chispa    -> un solo caracter   (como char en C)
  *   punto     -> dorado / crudo     (verdadero / falso)
+ *
+ * Ademas existe "nada" (como void en C), que solo se usa para decir que
+ * una preparacion no entrega ningun valor: rinde nada.
  */
 #ifndef TIPOS_H
 #define TIPOS_H
@@ -16,6 +19,7 @@ typedef enum {
   TIPO_BETUN,
   TIPO_CHISPA,
   TIPO_PUNTO,
+  TIPO_NADA,       /* solo para preparaciones: rinde nada (void) */
   TIPO_DESCONOCIDO /* se usa cuando una expresion tiene un error */
 } TipoDato;
 

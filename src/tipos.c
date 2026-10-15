@@ -11,6 +11,7 @@ const char *tipo_nombre(TipoDato tipo) {
   case TIPO_BETUN: return "betun";
   case TIPO_CHISPA: return "chispa";
   case TIPO_PUNTO: return "punto";
+  case TIPO_NADA: return "nada";
   case TIPO_DESCONOCIDO: break;
   }
   return "desconocido";
@@ -23,6 +24,7 @@ const char *tipo_equivalente_c(TipoDato tipo) {
   case TIPO_BETUN: return "char[]";
   case TIPO_CHISPA: return "char";
   case TIPO_PUNTO: return "bool";
+  case TIPO_NADA: return "void";
   case TIPO_DESCONOCIDO: break;
   }
   return "?";
@@ -34,6 +36,7 @@ TipoDato tipo_desde_texto(const char *texto) {
   if (strcmp(texto, "betun") == 0) return TIPO_BETUN;
   if (strcmp(texto, "chispa") == 0) return TIPO_CHISPA;
   if (strcmp(texto, "punto") == 0) return TIPO_PUNTO;
+  if (strcmp(texto, "nada") == 0) return TIPO_NADA;
   return TIPO_DESCONOCIDO;
 }
 

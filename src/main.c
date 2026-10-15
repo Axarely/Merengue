@@ -166,7 +166,9 @@ int main(int argc, char **argv) {
     printf("\n");
   }
   errores_imprimir(FASE_SEMANTICA);
-  advertencias_imprimir();
+  if (errores_semanticos == 0) {
+    advertencias_imprimir();
+  }
   if (errores_semanticos > 0) {
     resultado(&op, "%d errores semánticos", errores_semanticos);
     fprintf(stderr, "\nCompilación detenida: la mezcla tiene errores "

@@ -11,6 +11,7 @@
  *   - Los decimales se escriben con coma: 2,5
  *   - Los comentarios empiezan con '~' (el remolino de la manga pastelera)
  *   - Un nombre empieza con letra, sin tildes ni n con tilde, maximo 30 caracteres
+ *   - Los ingredientes de una preparacion se separan con 'y' (no con coma)
  */
 
 %{
@@ -63,6 +64,14 @@ NO_ASCII     [\x80-\xff]
 "raspa"                     { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_RASPA); }
 "a"                         { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_A); }
 "sirve"                     { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_SIRVE); }
+ /* Preparaciones (funciones del usuario) */
+"preparacion"               { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_PREPARACION); }
+"rinde"                     { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_RINDE); }
+"nada"                      { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_NADA); }
+"entrega"                   { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_ENTREGA); }
+"fin"                       { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_FIN); }
+"y"                         { REGISTRAR("SEPARADOR"); ENTREGAR(T_Y); }
+
 "degustar"                  { REGISTRAR("FUNCION_INTEGRADA"); ENTREGAR(T_DEGUSTAR); }
 "rebanar"                   { REGISTRAR("FUNCION_INTEGRADA"); ENTREGAR(T_REBANAR); }
 
@@ -181,6 +190,15 @@ NO_ASCII     [\x80-\xff]
 "+"|"-"|"*"|"/"             { REGISTRAR("OPERADOR"); ENTREGAR(yytext[0]); }
 "("|")"                     { REGISTRAR("PARENTESIS"); ENTREGAR(yytext[0]); }
 "."                         { REGISTRAR("FIN_INSTRUCCION"); ENTREGAR('.'); }
+":"                         { REGISTRAR("INICIO_DE_PASOS"); ENTREGAR(':'); }
+
+","                         {
+                              reportar_error(FASE_LEXICA, yylineno,
+                                "',' sola no se usa en Merengue (la coma es para decimales como 2,5): "
+                                "los ingredientes se separan con 'y'");
+                              REGISTRAR("ERROR_LEXICO");
+                              ENTREGAR(T_Y);
+                            }
 
 ";"                         {
                               reportar_error(FASE_LEXICA, yylineno,

@@ -1,0 +1,51 @@
+~ =============================================================
+~  Receta: fiesta de cumpleaños con PREPARACIONES (funciones)
+~  Una preparacion es una mini receta que recibe ingredientes
+~  (parametros), hace sus pasos y entrega (return) un resultado.
+~ =============================================================
+
+molde secreto porciones invitados con 12.        ~ global: lo ven todas las preparaciones
+
+~ ---- Preparacion que rinde tazas (como float en C) ----
+preparacion masa(porciones huevos y tazas harina) rinde tazas:
+    molde tazas mezcla con harina * 2.           ~ molde LOCAL: solo existe aqui
+    espolvorea huevos a mezcla.                  ~ porciones -> tazas
+    entrega mezcla.
+fin.
+
+~ ---- Preparacion que rinde porciones (como int en C) ----
+preparacion cupcakes_por_persona(porciones total) rinde porciones:
+    entrega total / invitados.                   ~ usa el molde global
+fin.
+
+~ ---- Preparacion que usa otra preparacion ----
+preparacion pastel_doble(tazas harina) rinde tazas:
+    entrega masa(3 y harina) + masa(3 y harina).
+fin.
+
+~ ---- Preparacion sin ingredientes que rinde betun ----
+preparacion saludo() rinde betun:
+    entrega "Feliz cumple".
+fin.
+
+~ ---- Preparacion que rinde nada (como void en C) ----
+preparacion decorar(betun nombre y chispa inicial) rinde nada:
+    molde betun texto con saludo().
+    espolvorea ", " a texto.
+    espolvorea nombre a texto.
+    sirve texto.
+    sirve inicial.
+    entrega.                                     ~ opcional en 'rinde nada'
+fin.
+
+~ ---- Receta principal ----
+molde tazas resultado con masa(4 y 2,5).        ~ 2,5 * 2 + 4 = 9,0
+molde porciones cada_uno con cupcakes_por_persona(36).
+molde tazas doble con pastel_doble(1,0).        ~ (2 + 3) + (2 + 3) = 10,0
+
+sirve resultado.
+sirve cada_uno.
+sirve doble.
+sirve masa(1 y 0,5) * 2.                         ~ una llamada dentro de una expresion
+sirve degustar(saludo()).
+decorar("Ana" y 'A').                            ~ llamada como instruccion
