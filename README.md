@@ -222,27 +222,30 @@ Feliz cumple, Ana
 
 ## Cómo compilar y ejecutar
 
-Se necesitan `gcc`, `make`, `flex` y `bison`.
+El compilador corre en **Linux** (por ejemplo, Ubuntu en una máquina virtual). Se necesitan `gcc`, `make`, `flex` y `bison`.
 
-**Linux o WSL (Ubuntu):**
+**1. Instalar las herramientas (una sola vez):**
 
 ```bash
-sudo apt install build-essential flex bison
+sudo apt update
+sudo apt install build-essential flex bison git
+```
+
+**2. Descargar el proyecto:**
+
+```bash
+git clone https://github.com/Axarely/Merengue.git
+cd Merengue
+```
+
+**3. Compilar y ejecutar una receta:**
+
+```bash
 make
 ./merengue ejemplos/cupcakes.mrg
 ```
 
-**Windows con MSYS2:** abre la terminal *MSYS2 UCRT64*, instala con `pacman -S make gcc flex bison` y usa los mismos comandos. Si ves símbolos raros en lugar de tildes, ejecuta antes `chcp 65001`.
-
-### En Visual Studio Code
-
-El repositorio incluye la carpeta `.vscode` con tareas listas:
-
-- `Ctrl+Shift+B` compila el proyecto.
-- Con una receta `.mrg` abierta, ve a **Terminal → Run Task...** y elige **Merengue: ejecutar la receta abierta**.
-- **Merengue: correr todas las pruebas** corre todos los ejemplos.
-
-En Windows, abre la carpeta desde WSL (`code .` dentro de la terminal de Ubuntu) para que `make`, `flex` y `bison` funcionen.
+`make` genera el analizador léxico con Flex, el sintáctico con Bison y compila todo con `gcc`. El resultado es el programa `./merengue`. Para borrar lo generado y compilar desde cero: `make clean` y luego `make`.
 
 ### Opciones
 
