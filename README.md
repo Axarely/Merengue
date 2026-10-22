@@ -222,30 +222,10 @@ Feliz cumple, Ana
 
 ## Cómo compilar y ejecutar
 
-El compilador corre en **Linux** (por ejemplo, Ubuntu en una máquina virtual). Se necesitan `gcc`, `make`, `flex` y `bison`.
-
-**1. Instalar las herramientas (una sola vez):**
-
-```bash
-sudo apt update
-sudo apt install build-essential flex bison git
-```
-
-**2. Descargar el proyecto:**
-
-```bash
-git clone https://github.com/Axarely/Merengue.git
-cd Merengue
-```
-
-**3. Compilar y ejecutar una receta:**
-
 ```bash
 make
 ./merengue ejemplos/cupcakes.mrg
 ```
-
-`make` genera el analizador léxico con Flex, el sintáctico con Bison y compila todo con `gcc`. El resultado es el programa `./merengue`. Para borrar lo generado y compilar desde cero: `make clean` y luego `make`.
 
 ### Opciones
 
