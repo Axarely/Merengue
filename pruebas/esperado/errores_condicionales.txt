@@ -1,0 +1,11 @@
+  [línea 5] Error semántico: La condición del 'si' tiene que ser punto (dorado o crudo) y aquí es porciones. Usa una comparación, por ejemplo: si huevos mayor que 2:
+  [línea 9] Error semántico: La mezcla se cortó: 'mayor que' solo compara porciones y tazas, no porciones con betun.
+  [línea 13] Error semántico: La mezcla se cortó: no se puede comparar betun con chispa usando 'igual a'.
+  [línea 17] Error semántico: La mezcla se cortó: 'no' solo se usa con punto (dorado o crudo), no con porciones.
+  [línea 21] Error semántico: La mezcla se cortó: 'y ademas' une dos condiciones (punto), no punto con porciones.
+  [línea 28] Error semántico: Ese molde no está en la mesa: 'aviso' no fue declarado (declara primero con: molde <tipo> aviso.)
+  [línea 30] Error semántico: La preparación 'porcion' rinde porciones pero puede terminar sin entregar: revisa que el 'si' tenga 'sino' y que todos los caminos tengan entrega.
+  [línea 37] Error semántico: No se puede declarar la preparación 'adorno' dentro de un si: las preparaciones van en la receta principal.
+
+Compilación detenida: la mezcla tiene errores semánticos.
+codigo de salida: 1

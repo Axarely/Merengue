@@ -175,6 +175,54 @@ Nodo *nodo_llamada(int linea, const char *nombre, Nodo *argumentos) {
   return nodo;
 }
 
+Nodo *nodo_si(int linea, Nodo *condicion, Nodo *entonces, Nodo *sino) {
+  Nodo *nodo = nodo_nuevo(NODO_SI, linea);
+  nodo_agregar_hijo(nodo, condicion);
+  nodo_agregar_hijo(nodo, entonces);
+  nodo_agregar_hijo(nodo, sino);
+  return nodo;
+}
+
+Nodo *nodo_bloque(TipoNodo clase, Nodo *pasos) {
+  pasos->clase = clase;
+  return pasos;
+}
+
+Nodo *nodo_comparacion(int linea, TipoComparacion comparacion, Nodo *izquierda,
+                       Nodo *derecha) {
+  Nodo *nodo = nodo_nuevo(NODO_COMPARACION, linea);
+  nodo->comparacion = comparacion;
+  nodo_agregar_hijo(nodo, izquierda);
+  nodo_agregar_hijo(nodo, derecha);
+  return nodo;
+}
+
+Nodo *nodo_logica(int linea, TipoLogica logica, Nodo *izquierda, Nodo *derecha) {
+  Nodo *nodo = nodo_nuevo(NODO_LOGICA, linea);
+  nodo->logica = logica;
+  nodo_agregar_hijo(nodo, izquierda);
+  nodo_agregar_hijo(nodo, derecha);
+  return nodo;
+}
+
+Nodo *nodo_no(int linea, Nodo *expresion) {
+  Nodo *nodo = nodo_nuevo(NODO_NO, linea);
+  nodo_agregar_hijo(nodo, expresion);
+  return nodo;
+}
+
+const char *comparacion_texto(TipoComparacion comparacion) {
+  switch (comparacion) {
+  case COMP_MAYOR: return "mayor que";
+  case COMP_MENOR: return "menor que";
+  case COMP_MAYOR_IGUAL: return "mayor o igual que";
+  case COMP_MENOR_IGUAL: return "menor o igual que";
+  case COMP_IGUAL: return "igual a";
+  case COMP_DISTINTO: return "distinto de";
+  }
+  return "?";
+}
+
 /* ------------------------------------------------------------------ */
 /* Descripcion de nodos                                                */
 /* ------------------------------------------------------------------ */
@@ -196,6 +244,12 @@ const char *ast_nombre_clase(TipoNodo clase) {
   case NODO_PASOS: return "Pasos";
   case NODO_ENTREGA: return "Entrega";
   case NODO_LLAMADA: return "Llamada";
+  case NODO_SI: return "Si";
+  case NODO_ENTONCES: return "Entonces";
+  case NODO_SINO: return "Sino";
+  case NODO_COMPARACION: return "Comparación";
+  case NODO_LOGICA: return "Lógica";
+  case NODO_NO: return "No";
   }
   return "?";
 }
@@ -297,6 +351,25 @@ static void describir_detalle(const Nodo *nodo, char *destino, int tamano) {
     snprintf(destino, (size_t)tamano, "%s, %d argumento%s", nodo->nombre,
              nodo->num_hijos, nodo->num_hijos == 1 ? "" : "s");
     break;
+  case NODO_SI:
+    snprintf(destino, (size_t)tamano, "%s",
+             nodo->num_hijos > 2 ? "con sino" : "sin sino");
+    break;
+  case NODO_ENTONCES:
+  case NODO_SINO:
+    snprintf(destino, (size_t)tamano, "%d instrucci%s", nodo->num_hijos,
+             nodo->num_hijos == 1 ? "ón" : "ones");
+    break;
+  case NODO_COMPARACION:
+    snprintf(destino, (size_t)tamano, "%s", comparacion_texto(nodo->comparacion));
+    break;
+  case NODO_LOGICA:
+    snprintf(destino, (size_t)tamano, "%s",
+             nodo->logica == LOGICA_O ? "o" : "y ademas");
+    break;
+  case NODO_NO:
+    snprintf(destino, (size_t)tamano, "no");
+    break;
   }
 }
 
@@ -310,7 +383,9 @@ void ast_describir(const Nodo *nodo, char *destino, int tamano) {
 static int es_expresion(const Nodo *nodo) {
   return nodo->clase == NODO_LITERAL || nodo->clase == NODO_IDENTIFICADOR ||
          nodo->clase == NODO_OPERACION || nodo->clase == NODO_NEGATIVO ||
-         nodo->clase == NODO_FUNCION || nodo->clase == NODO_LLAMADA;
+         nodo->clase == NODO_FUNCION || nodo->clase == NODO_LLAMADA ||
+         nodo->clase == NODO_COMPARACION || nodo->clase == NODO_LOGICA ||
+         nodo->clase == NODO_NO;
 }
 
 /* ------------------------------------------------------------------ */
@@ -350,7 +425,7 @@ static void imprimir_rama(const Nodo *nodo, const char *prefijo, int es_ultimo,
   }
   if (nodo->clase == NODO_DECLARACION || nodo->clase == NODO_ASIGNACION ||
       nodo->clase == NODO_SIRVE || nodo->clase == NODO_PREPARACION ||
-      nodo->clase == NODO_ENTREGA) {
+      nodo->clase == NODO_ENTREGA || nodo->clase == NODO_SI) {
     printf("   [línea %d]", nodo->linea);
   }
   printf("\n");

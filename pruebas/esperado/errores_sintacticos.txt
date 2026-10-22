@@ -1,10 +1,11 @@
   [línea 2] Error sintáctico: falta el punto '.' al final de la instrucción
-  [línea 4] Error sintáctico: no se esperaba 'en'; se esperaba un valor (número, texto, molde, dorado/crudo...)
+  [línea 4] Error sintáctico: no se esperaba 'en'; se esperaba un valor (número, texto, molde...)
   [línea 5] Error sintáctico: no se esperaba 'con'; se esperaba nombre de molde
-  [línea 6] Error sintáctico: no se esperaba 'en'; se esperaba 'a', '+', '-', '*' o '/'
-  [línea 7] Error sintáctico: no se esperaba '.'; se esperaba '+', '-', '*', '/' o ')'
+  [línea 6] Error sintáctico: no se esperaba 'en'; se esperaba 'a' o un operador (+, -, mayor que...)
+  [línea 7] Error sintáctico: no se esperaba '.'; se esperaba ')' o un operador (+, -, mayor que...)
   [línea 9] Error sintáctico: no se esperaba tipo de dato; se esperaba 'rinde'
-  [línea 11] Error sintáctico: sobra 'fin': no hay ninguna preparación abierta (revisa el encabezado de la preparación)
+  [línea 11] Error sintáctico: sobra 'fin': no hay ninguna preparación ni ningún si abierto (revisa su primera línea)
+  [línea 13] Error sintáctico: falta 'fin.' para cerrar el si que empieza en la línea 12
 
 Compilación detenida: corrige los errores léxicos y sintácticos.
 codigo de salida: 1

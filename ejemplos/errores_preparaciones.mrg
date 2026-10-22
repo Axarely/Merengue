@@ -21,7 +21,7 @@ preparacion repetida(porciones c y tazas c) rinde nada:   ~ ingrediente repetido
 fin.
 
 preparacion eco(porciones n) rinde porciones:
-    entrega eco(n).                                    ~ no puede usarse a si misma
+    entrega eco(n).                                    ~ se llama a si misma sin un si: infinita
 fin.
 
 molde tazas t1 con masa(3).                ~ faltan ingredientes

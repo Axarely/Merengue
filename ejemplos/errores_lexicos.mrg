@@ -6,3 +6,4 @@ molde chispa letra con 'AB'.           ~ una chispa es un solo caracter
 molde porciones total con 5;           ~ ';' no se usa, se termina con '.'
 vierte 4 en total @.                   ~ '@' no existe en Merengue
 sirve masa(1, 2,5).                    ~ los ingredientes se separan con 'y', no con ','
+molde punto mucho con 3 > 2.           ~ las comparaciones se escriben con palabras: mayor que

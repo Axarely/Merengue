@@ -5,10 +5,12 @@
  * ingredientes (parametros) y preparaciones (funciones). Cada renglon
  * dice en que AMBITO vive:
  *   - "global": declarado en la receta principal,
- *   - el nombre de una preparacion: declarado dentro de ella.
+ *   - el nombre de una preparacion: declarado dentro de ella,
+ *   - "si L12" / "sino L14": declarado dentro de un bloque de un si.
  *
- * Al salir de una preparacion sus nombres quedan INACTIVOS: ya no se
- * pueden usar, pero siguen en la tabla para mostrarlos al final.
+ * Los ambitos se apilan (una preparacion puede tener un si, y ese si otro
+ * si). Al salir de un ambito sus nombres quedan INACTIVOS: ya no se pueden
+ * usar, pero siguen en la tabla para mostrarlos al final.
  *
  * La llena el analizador semantico y la usa el interprete para guardar
  * el valor de cada molde mientras corre la receta.
@@ -39,7 +41,7 @@ typedef struct {
   TipoDato tipo;           /* en una preparacion: el tipo que rinde */
   Categoria categoria;
   char *ambito;            /* "global" o el nombre de la preparacion */
-  int nivel;               /* 0 = global, 1 = dentro de una preparacion */
+  int nivel;               /* 0 = global, 1, 2, ... = ambitos anidados */
   int activo;              /* 0 cuando ya se salio de su ambito */
   int linea_declaracion;
   int tiene_valor_inicial; /* 1 si se declaro con 'con' */
@@ -47,6 +49,8 @@ typedef struct {
   int modificaciones;      /* veces que recibe vierte/espolvorea/raspa */
   int num_ingredientes;    /* solo preparaciones */
   const void *definicion;  /* solo preparaciones: su nodo del AST */
+  int primer_local;        /* solo preparaciones: posicion de su primer */
+  int num_locales;         /* ingrediente/molde local y cuantos tiene  */
   Valor valor;             /* valor durante la ejecucion */
 } Simbolo;
 
@@ -55,13 +59,13 @@ typedef struct {
   int cantidad;
   int capacidad;
   int nivel_actual;
-  char *ambito_actual;
+  char *ambitos[64]; /* nombre de cada ambito abierto (0 = global) */
 } TablaSimbolos;
 
 void tabla_iniciar(TablaSimbolos *tabla);
 
-/* Entra a una preparacion / sale de ella. */
-void tabla_entrar_ambito(TablaSimbolos *tabla, const char *nombre_preparacion);
+/* Abre un ambito nuevo (preparacion o bloque de un si) / lo cierra. */
+void tabla_entrar_ambito(TablaSimbolos *tabla, const char *nombre);
 void tabla_salir_ambito(TablaSimbolos *tabla);
 
 /* Agrega un nombre al ambito actual. Devuelve su posicion, o -1 si ya
@@ -69,8 +73,8 @@ void tabla_salir_ambito(TablaSimbolos *tabla);
 int tabla_insertar(TablaSimbolos *tabla, const char *nombre, TipoDato tipo,
                    Categoria categoria, int linea, int tiene_valor_inicial);
 
-/* Busca un nombre visible: primero en el ambito actual y luego en el
-   global. Devuelve su posicion o -1. */
+/* Busca un nombre visible: primero en el ambito actual y luego en los
+   de afuera, hasta el global. Devuelve su posicion o -1. */
 int tabla_buscar(const TablaSimbolos *tabla, const char *nombre);
 
 /* Busca solo en el ambito global. */

@@ -1,7 +1,7 @@
   [línea 11] Error semántico: La preparación 'sin_entrega' rinde porciones pero nunca entrega nada (falta  entrega <valor>.).
   [línea 16] Error semántico: La mezcla se cortó: 'entrega_mal' rinde porciones y se quiere entregar tazas. Usa rebanar(...).
   [línea 19] Error semántico: El ingrediente 'c' está repetido en 'repetida'.
-  [línea 24] Error semántico: La preparación 'eco' no puede usarse a sí misma.
+  [línea 23] Error semántico: La preparación 'eco' se llama a sí misma pero no tiene ningún 'si' para detenerse: se repetiría para siempre.
   [línea 27] Error semántico: La preparación 'masa' lleva 2 ingredientes y se le dieron 1.
   [línea 28] Error semántico: La mezcla se cortó: el ingrediente 1 de 'masa' (huevos) es porciones y se le dio betun.
   [línea 29] Error semántico: La mezcla se cortó: 't3' es porciones y no acepta tazas (se perderían los decimales). Usa rebanar(...) para cortar los decimales.

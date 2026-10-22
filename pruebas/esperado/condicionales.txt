@@ -1,0 +1,11 @@
+Hay suficientes huevos
+Harina justa
+Pastel de chocolate mediano o grande
+dorado
+A hornear!
+100
+200
+180
+15
+Cuatro huevos exactos
+codigo de salida: 0

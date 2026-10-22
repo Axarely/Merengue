@@ -10,7 +10,7 @@ void tabla_iniciar(TablaSimbolos *tabla) {
   tabla->cantidad = 0;
   tabla->capacidad = 0;
   tabla->nivel_actual = 0;
-  tabla->ambito_actual = NULL;
+  for (int i = 0; i < 64; i++) tabla->ambitos[i] = NULL;
 }
 
 /* ------------------------------------------------------------------ */
@@ -18,27 +18,32 @@ void tabla_iniciar(TablaSimbolos *tabla) {
 /* ------------------------------------------------------------------ */
 
 static const char *ambito_texto(const TablaSimbolos *tabla) {
-  return tabla->ambito_actual != NULL ? tabla->ambito_actual : "global";
+  const char *nombre = tabla->ambitos[tabla->nivel_actual];
+  return nombre != NULL ? nombre : "global";
 }
 
-void tabla_entrar_ambito(TablaSimbolos *tabla, const char *nombre_preparacion) {
-  free(tabla->ambito_actual);
-  tabla->ambito_actual = copiar_texto(nombre_preparacion);
-  tabla->nivel_actual = 1;
+void tabla_entrar_ambito(TablaSimbolos *tabla, const char *nombre) {
+  if (tabla->nivel_actual >= 63) {
+    fprintf(stderr, "Demasiados bloques uno dentro de otro\n");
+    exit(EXIT_FAILURE);
+  }
+  tabla->nivel_actual++;
+  free(tabla->ambitos[tabla->nivel_actual]);
+  tabla->ambitos[tabla->nivel_actual] = copiar_texto(nombre);
 }
 
 void tabla_salir_ambito(TablaSimbolos *tabla) {
-  /* Los nombres de la preparacion dejan de ser visibles, pero se quedan
-     en la tabla para poder mostrarlos. */
+  if (tabla->nivel_actual == 0) return;
+  /* Los nombres del ambito dejan de ser visibles, pero se quedan en la
+     tabla para poder mostrarlos. */
   for (int i = 0; i < tabla->cantidad; i++) {
-    if (tabla->simbolos[i].nivel == tabla->nivel_actual &&
-        tabla->simbolos[i].activo) {
+    if (tabla->simbolos[i].nivel == tabla->nivel_actual) {
       tabla->simbolos[i].activo = 0;
     }
   }
-  free(tabla->ambito_actual);
-  tabla->ambito_actual = NULL;
-  tabla->nivel_actual = 0;
+  free(tabla->ambitos[tabla->nivel_actual]);
+  tabla->ambitos[tabla->nivel_actual] = NULL;
+  tabla->nivel_actual--;
 }
 
 static int buscar_en_nivel(const TablaSimbolos *tabla, const char *nombre,
@@ -61,11 +66,12 @@ int tabla_buscar_global(const TablaSimbolos *tabla, const char *nombre) {
 }
 
 int tabla_buscar(const TablaSimbolos *tabla, const char *nombre) {
-  int posicion = tabla_buscar_local(tabla, nombre);
-  if (posicion < 0 && tabla->nivel_actual > 0) {
-    posicion = tabla_buscar_global(tabla, nombre);
+  /* Del ambito mas interno hacia afuera. */
+  for (int nivel = tabla->nivel_actual; nivel >= 0; nivel--) {
+    int posicion = buscar_en_nivel(tabla, nombre, nivel);
+    if (posicion >= 0) return posicion;
   }
-  return posicion;
+  return -1;
 }
 
 Simbolo *tabla_simbolo(TablaSimbolos *tabla, int posicion) {
@@ -151,13 +157,19 @@ void tabla_imprimir(const TablaSimbolos *tabla, int con_valores) {
       break;
     case CAT_INGREDIENTE:
       snprintf(detalle, sizeof(detalle), "parámetro");
-      valor_a_texto(&s->valor, final, sizeof(final));
       break;
     default:
       snprintf(detalle, sizeof(detalle), "%s",
                s->tiene_valor_inicial ? "con valor" : "por defecto");
-      valor_a_texto(&s->valor, final, sizeof(final));
       break;
+    }
+    if (s->categoria != CAT_PREPARACION) {
+      if (s->nivel == 0) {
+        valor_a_texto(&s->valor, final, sizeof(final));
+      } else {
+        /* Los locales solo existen mientras corre su bloque o preparacion. */
+        snprintf(final, sizeof(final), "(local)");
+      }
     }
 
     const char *celdas[COLUMNAS] = {s->nombre,
@@ -182,7 +194,7 @@ void tabla_liberar(TablaSimbolos *tabla) {
     valor_liberar(&tabla->simbolos[i].valor);
   }
   free(tabla->simbolos);
-  free(tabla->ambito_actual);
+  for (int i = 0; i < 64; i++) free(tabla->ambitos[i]);
   tabla_iniciar(tabla);
 }
 

@@ -16,6 +16,7 @@
  *   ingredientes -> TIPO NOMBRE (y TIPO NOMBRE)*  | (vacio)
  *   llamada      -> NOMBRE ( argumentos )      argumentos -> expresion (y expresion)*
  *   entrega      -> entrega expresion | entrega
+ *   condicional  -> si expresion : pasos [sino si expresion : pasos]* [sino : pasos] fin .
  *   declaracion  -> molde [secreto] TIPO NOMBRE [con expresion]
  *   asignacion   -> vierte expresion en NOMBRE
  *                 | espolvorea expresion a NOMBRE
@@ -24,6 +25,8 @@
  *   expresion    -> expresion (+ - * /) expresion | - expresion
  *                 | ( expresion ) | degustar ( expresion )
  *                 | rebanar ( expresion ) | llamada | NOMBRE | literal
+ *                 | expresion (mayor que | menor que | igual a | ...) expresion
+ *                 | expresion o expresion | expresion y ademas expresion | no expresion
  */
 
 %code requires {
@@ -47,9 +50,23 @@ extern int linea_token_anterior;
 /* Raiz del AST: la usa main.c cuando termina el analisis. */
 Nodo *raiz_ast = NULL;
 
-/* Preparaciones abiertas (para avisar si falta 'fin.'). */
-static int preparaciones_abiertas = 0;
-static int linea_preparacion_abierta = 0;
+/* Bloques abiertos (preparaciones y si) para avisar si falta 'fin.'. */
+#define MAXIMO_BLOQUES 64
+static int bloques_abiertos = 0;
+static const char *bloque_tipo[MAXIMO_BLOQUES];
+static int bloque_linea[MAXIMO_BLOQUES];
+
+static void abrir_bloque(const char *tipo, int linea) {
+  if (bloques_abiertos < MAXIMO_BLOQUES) {
+    bloque_tipo[bloques_abiertos] = tipo;
+    bloque_linea[bloques_abiertos] = linea;
+  }
+  bloques_abiertos++;
+}
+
+static void cerrar_bloque(void) {
+  if (bloques_abiertos > 0) bloques_abiertos--;
+}
 %}
 
 %locations
@@ -81,6 +98,17 @@ static int linea_preparacion_abierta = 0;
 %token T_ENTREGA "entrega"
 %token T_FIN "fin"
 %token T_Y "y"
+%token T_SI "si"
+%token T_SINO "sino"
+%token T_MAYOR "mayor que"
+%token T_MENOR "menor que"
+%token T_MAYOR_IGUAL "mayor o igual que"
+%token T_MENOR_IGUAL "menor o igual que"
+%token T_IGUAL "igual a"
+%token T_DISTINTO "distinto de"
+%token T_O "o"
+%token T_Y_ADEMAS "y ademas"
+%token T_NO "no"
 
 %token <texto>    T_TIPO          "tipo de dato"
 %token <texto>    T_ID            "nombre de molde"
@@ -93,9 +121,14 @@ static int linea_preparacion_abierta = 0;
 %type <nodo> instrucciones instruccion declaracion asignacion salida expresion
 %type <nodo> preparacion ingredientes lista_ingredientes ingrediente pasos
 %type <nodo> llamada argumentos lista_argumentos entrega
+%type <nodo> condicional resto_si
 %type <entero> tipo_que_rinde
 
 /* Precedencia: de menor a mayor. */
+%left T_O
+%left T_Y_ADEMAS
+%precedence T_NO
+%nonassoc T_MAYOR T_MENOR T_MAYOR_IGUAL T_MENOR_IGUAL T_IGUAL T_DISTINTO
 %left '+' '-'
 %left '*' '/'
 %precedence NEGATIVO
@@ -124,6 +157,7 @@ instruccion
     | preparacion                   { $$ = $1; }
     | llamada '.'                   { $$ = $1; /* p. ej.  decorar("Ana"). */ }
     | entrega '.'                   { $$ = $1; }
+    | condicional                   { $$ = $1; }
     | error '.'                     { $$ = NULL; yyerrok; /* sigue con la siguiente instruccion */ }
     ;
 
@@ -160,9 +194,9 @@ salida
 
 preparacion
     : T_PREPARACION T_ID '(' ingredientes ')' T_RINDE tipo_que_rinde ':'
-        { if (preparaciones_abiertas++ == 0) linea_preparacion_abierta = @1.first_line; }
+        { abrir_bloque("la preparación", @1.first_line); }
       pasos T_FIN '.'
-        { preparaciones_abiertas--;
+        { cerrar_bloque();
           $$ = nodo_preparacion(@1.first_line, $2, $4, (TipoDato)$7, $10); free($2); }
     ;
 
@@ -191,6 +225,33 @@ pasos
     | pasos instruccion             { $$ = $1; nodo_agregar_hijo($$, $2); }
     ;
 
+/* ---------- Condicionales (Regla 5) ---------- */
+
+/*   si <condicion>:
+ *       ...
+ *   sino si <condicion>:     (opcional, se puede repetir)
+ *       ...
+ *   sino:                    (opcional)
+ *       ...
+ *   fin.
+ */
+condicional
+    : T_SI expresion ':' { abrir_bloque("el si", @1.first_line); } pasos resto_si
+        { cerrar_bloque();
+          $$ = nodo_si(@1.first_line, $2, nodo_bloque(NODO_ENTONCES, $5), $6); }
+    ;
+
+resto_si
+    : T_FIN '.'                     { $$ = NULL; }
+    | T_SINO ':' pasos T_FIN '.'    { $$ = nodo_bloque(NODO_SINO, $3); }
+    | T_SINO T_SI expresion ':' pasos resto_si
+        { /* "sino si" = un si nuevo dentro del sino */
+          Nodo *sino = nodo_pasos(@1.first_line);
+          nodo_agregar_hijo(sino, nodo_si(@2.first_line, $3,
+                                          nodo_bloque(NODO_ENTONCES, $5), $6));
+          $$ = nodo_bloque(NODO_SINO, sino); }
+    ;
+
 entrega
     : T_ENTREGA expresion           { $$ = nodo_entrega(@1.first_line, $2); }
     | T_ENTREGA                     { $$ = nodo_entrega(@1.first_line, NULL); }
@@ -215,6 +276,15 @@ expresion
     | expresion '-' expresion       { $$ = nodo_operacion(@2.first_line, '-', $1, $3); }
     | expresion '*' expresion       { $$ = nodo_operacion(@2.first_line, '*', $1, $3); }
     | expresion '/' expresion       { $$ = nodo_operacion(@2.first_line, '/', $1, $3); }
+    | expresion T_MAYOR expresion       { $$ = nodo_comparacion(@2.first_line, COMP_MAYOR, $1, $3); }
+    | expresion T_MENOR expresion       { $$ = nodo_comparacion(@2.first_line, COMP_MENOR, $1, $3); }
+    | expresion T_MAYOR_IGUAL expresion { $$ = nodo_comparacion(@2.first_line, COMP_MAYOR_IGUAL, $1, $3); }
+    | expresion T_MENOR_IGUAL expresion { $$ = nodo_comparacion(@2.first_line, COMP_MENOR_IGUAL, $1, $3); }
+    | expresion T_IGUAL expresion       { $$ = nodo_comparacion(@2.first_line, COMP_IGUAL, $1, $3); }
+    | expresion T_DISTINTO expresion    { $$ = nodo_comparacion(@2.first_line, COMP_DISTINTO, $1, $3); }
+    | expresion T_O expresion           { $$ = nodo_logica(@2.first_line, LOGICA_O, $1, $3); }
+    | expresion T_Y_ADEMAS expresion    { $$ = nodo_logica(@2.first_line, LOGICA_Y, $1, $3); }
+    | T_NO expresion                    { $$ = nodo_no(@1.first_line, $2); }
     | '-' expresion %prec NEGATIVO  { $$ = nodo_negativo(@1.first_line, $2); }
     | '(' expresion ')'             { $$ = $2; /* los parentesis no crean nodo */ }
     | T_DEGUSTAR '(' expresion ')'  { $$ = nodo_funcion(@1.first_line, FUNC_DEGUSTAR, $3); }
@@ -260,21 +330,42 @@ static void nombre_legible(yysymbol_kind_t simbolo, char *destino, size_t tamano
 }
 
 /* Mensaje de error de sintaxis en espanol (parse.error custom). */
+/* 1 si el simbolo es el caracter dado, p. ej. simbolo_es(s, "'+'"). */
+static int simbolo_es(yysymbol_kind_t s, const char *nombre) {
+  return strcmp(yysymbol_name(s), nombre) == 0;
+}
+
+/* Clasifica un token esperado para resumir la lista en el mensaje. */
+static int es_operador(yysymbol_kind_t s) {
+  return simbolo_es(s, "'+'") || simbolo_es(s, "'-'") || simbolo_es(s, "'*'") ||
+         simbolo_es(s, "'/'") || s == YYSYMBOL_T_MAYOR || s == YYSYMBOL_T_MENOR ||
+         s == YYSYMBOL_T_MAYOR_IGUAL || s == YYSYMBOL_T_MENOR_IGUAL ||
+         s == YYSYMBOL_T_IGUAL || s == YYSYMBOL_T_DISTINTO || s == YYSYMBOL_T_O ||
+         s == YYSYMBOL_T_Y_ADEMAS;
+}
+
+static int es_inicio_de_valor(yysymbol_kind_t s) {
+  return s == YYSYMBOL_T_ID || s == YYSYMBOL_T_LIT_PORCIONES ||
+         s == YYSYMBOL_T_LIT_TAZAS || s == YYSYMBOL_T_LIT_BETUN ||
+         s == YYSYMBOL_T_LIT_CHISPA || s == YYSYMBOL_T_LIT_PUNTO ||
+         simbolo_es(s, "'('") || s == YYSYMBOL_T_NO || s == YYSYMBOL_T_DEGUSTAR ||
+         s == YYSYMBOL_T_REBANAR;
+}
+
+/* Mensaje de error de sintaxis en espanol (parse.error custom). */
 static int yyreport_syntax_error(const yypcontext_t *contexto) {
-  enum { MAXIMO = 8 };
+  enum { MAXIMO = 64 };
   yysymbol_kind_t esperados[MAXIMO];
-  int total = yypcontext_expected_tokens(contexto, NULL, 0);
-  int cantidad = total <= MAXIMO
-                     ? yypcontext_expected_tokens(contexto, esperados, MAXIMO)
-                     : 0;
+  int cantidad = yypcontext_expected_tokens(contexto, esperados, MAXIMO);
+  if (cantidad < 0) cantidad = 0;
   yysymbol_kind_t encontrado = yypcontext_token(contexto);
   int linea = yypcontext_location(contexto)->first_line;
 
-  int espera_punto = 0;
+  int espera_punto = 0, operadores = 0, valores = 0;
   for (int i = 0; i < cantidad; i++) {
-    if (strcmp(yysymbol_name(esperados[i]), "'.'") == 0) {
-      espera_punto = 1;
-    }
+    if (simbolo_es(esperados[i], "'.'")) espera_punto = 1;
+    if (es_operador(esperados[i]) && !simbolo_es(esperados[i], "'-'")) operadores++;
+    if (es_inicio_de_valor(esperados[i])) valores++;
   }
 
   char mensaje[512];
@@ -288,34 +379,65 @@ static int yyreport_syntax_error(const yypcontext_t *contexto) {
     return 0;
   }
 
-  if (encontrado == YYSYMBOL_YYEOF && preparaciones_abiertas > 0) {
+  if (encontrado == YYSYMBOL_YYEOF && bloques_abiertos > 0) {
+    int i = bloques_abiertos <= MAXIMO_BLOQUES ? bloques_abiertos - 1
+                                               : MAXIMO_BLOQUES - 1;
     reportar_error(FASE_SINTACTICA, linea_token_anterior,
-                   "falta 'fin.' para cerrar la preparación que empieza en la "
-                   "línea %d",
-                   linea_preparacion_abierta);
+                   "falta 'fin.' para cerrar %s que empieza en la línea %d",
+                   bloque_tipo[i], bloque_linea[i]);
     return 0;
   }
-  if (encontrado == YYSYMBOL_T_FIN && preparaciones_abiertas == 0) {
+  if ((encontrado == YYSYMBOL_T_FIN || encontrado == YYSYMBOL_T_SINO) &&
+      bloques_abiertos == 0) {
     reportar_error(FASE_SINTACTICA, linea,
-                   "sobra 'fin': no hay ninguna preparación abierta "
-                   "(revisa el encabezado de la preparación)");
+                   "sobra '%s': no hay ninguna preparación ni ningún si abierto "
+                   "(revisa su primera línea)",
+                   encontrado == YYSYMBOL_T_FIN ? "fin" : "sino");
     return 0;
   }
 
+  if (encontrado == YYSYMBOL_T_MAYOR || encontrado == YYSYMBOL_T_MENOR ||
+      encontrado == YYSYMBOL_T_MAYOR_IGUAL || encontrado == YYSYMBOL_T_MENOR_IGUAL ||
+      encontrado == YYSYMBOL_T_IGUAL || encontrado == YYSYMBOL_T_DISTINTO) {
+    reportar_error(FASE_SINTACTICA, linea,
+                   "no se pueden encadenar comparaciones; únelas con 'y ademas' "
+                   "(por ejemplo: x mayor que 1 y ademas x menor que 5)");
+    return 0;
+  }
+
+  /* Arma la lista de lo esperado, resumiendo operadores y valores. */
+  const char *partes[MAXIMO + 2];
+  char nombres[MAXIMO][96];
+  int num_partes = 0;
+  int resumir_valores = valores >= 3;
+  /* '-' es operador si tambien se espera '+'; si no, es el signo negativo. */
+  int menos_es_operador = 0;
+  for (int i = 0; i < cantidad; i++) {
+    if (simbolo_es(esperados[i], "'+'")) menos_es_operador = 1;
+  }
+  if (resumir_valores) partes[num_partes++] = "un valor (número, texto, molde...)";
+  for (int i = 0; i < cantidad; i++) {
+    yysymbol_kind_t s = esperados[i];
+    if (simbolo_es(s, "'-'") && !menos_es_operador) {
+      if (resumir_valores) continue; /* el signo negativo ya va en "un valor" */
+    } else if (es_operador(s)) {
+      continue;
+    }
+    if (resumir_valores && es_inicio_de_valor(s)) continue;
+    nombre_legible(s, nombres[i], sizeof(nombres[i]));
+    partes[num_partes++] = nombres[i];
+  }
+  if (operadores > 0) partes[num_partes++] = "un operador (+, -, mayor que...)";
+
   snprintf(mensaje, sizeof(mensaje), "no se esperaba %s", nombre);
-  if (total > MAXIMO) {
-    /* Muchas opciones: es el inicio de una expresion. */
-    strncat(mensaje, "; se esperaba un valor (número, texto, molde, dorado/crudo...)",
-            sizeof(mensaje) - strlen(mensaje) - 1);
-  } else if (cantidad > 0) {
+  if (num_partes > 0) {
     strncat(mensaje, "; se esperaba ", sizeof(mensaje) - strlen(mensaje) - 1);
-    for (int i = 0; i < cantidad; i++) {
-      nombre_legible(esperados[i], nombre, sizeof(nombre));
+    for (int i = 0; i < num_partes; i++) {
       if (i > 0) {
-        strncat(mensaje, i == cantidad - 1 ? " o " : ", ",
+        strncat(mensaje, i == num_partes - 1 ? " o " : ", ",
                 sizeof(mensaje) - strlen(mensaje) - 1);
       }
-      strncat(mensaje, nombre, sizeof(mensaje) - strlen(mensaje) - 1);
+      strncat(mensaje, partes[i], sizeof(mensaje) - strlen(mensaje) - 1);
     }
   }
   reportar_error(FASE_SINTACTICA, linea, "%s", mensaje);

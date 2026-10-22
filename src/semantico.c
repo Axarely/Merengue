@@ -10,8 +10,11 @@ static int linea_ultima_declaracion; /* para "un solo molde por linea" */
 /* Preparacion que se esta revisando (NULL = receta principal). */
 static Nodo *preparacion_actual;
 static int entregas_encontradas;
+static int se_llama_a_si_misma; /* la preparacion actual es recursiva */
+static int tiene_si;            /* la preparacion actual tiene algun si */
 
 static void analizar_instruccion(Nodo *instruccion);
+static TipoDato analizar_expresion(Nodo *nodo);
 
 /* ------------------------------------------------------------------ */
 /* Reglas de compatibilidad (Regla 3 del documento)                    */
@@ -74,18 +77,11 @@ static TipoDato analizar_llamada(Nodo *nodo, int como_valor) {
 
   int posicion = tabla_buscar(mesa, nodo->nombre);
   if (posicion < 0) {
-    if (preparacion_actual != NULL &&
-        strcmp(preparacion_actual->nombre, nodo->nombre) == 0) {
-      reportar_error(FASE_SEMANTICA, nodo->linea,
-                     "La preparación '%s' no puede usarse a sí misma.",
-                     nodo->nombre);
-    } else {
-      reportar_error(FASE_SEMANTICA, nodo->linea,
-                     "Esa preparación no está en el recetario: '%s' no fue "
-                     "declarada (declárala antes con: preparacion %s(...) "
-                     "rinde <tipo>: ... fin.)",
-                     nodo->nombre, nodo->nombre);
-    }
+    reportar_error(FASE_SEMANTICA, nodo->linea,
+                   "Esa preparación no está en el recetario: '%s' no fue "
+                   "declarada (declárala antes con: preparacion %s(...) "
+                   "rinde <tipo>: ... fin.)",
+                   nodo->nombre, nodo->nombre);
     return nodo->tipo_dato;
   }
 
@@ -99,6 +95,9 @@ static TipoDato analizar_llamada(Nodo *nodo, int como_valor) {
   }
   nodo->simbolo = posicion;
   simbolo->usos++;
+  if (preparacion_actual != NULL && simbolo->definicion == preparacion_actual) {
+    se_llama_a_si_misma = 1;
+  }
 
   const Nodo *definicion = simbolo->definicion;
   const Nodo *ingredientes = definicion->hijos[0];
@@ -228,6 +227,70 @@ static TipoDato analizar_expresion(Nodo *nodo) {
   case NODO_LLAMADA:
     return analizar_llamada(nodo, 1);
 
+  case NODO_COMPARACION: {
+    TipoDato izquierda = analizar_expresion(nodo->hijos[0]);
+    TipoDato derecha = analizar_expresion(nodo->hijos[1]);
+    nodo->tipo_dato = TIPO_DESCONOCIDO;
+    if (izquierda == TIPO_DESCONOCIDO || derecha == TIPO_DESCONOCIDO) {
+      return nodo->tipo_dato;
+    }
+    int numericos = tipo_es_numerico(izquierda) && tipo_es_numerico(derecha);
+    int de_orden = nodo->comparacion != COMP_IGUAL &&
+                   nodo->comparacion != COMP_DISTINTO;
+    if (de_orden && !numericos) {
+      reportar_error(FASE_SEMANTICA, nodo->linea,
+                     "La mezcla se cortó: '%s' solo compara porciones y tazas, "
+                     "no %s con %s.",
+                     comparacion_texto(nodo->comparacion), tipo_nombre(izquierda),
+                     tipo_nombre(derecha));
+      return nodo->tipo_dato;
+    }
+    if (!de_orden && !numericos && izquierda != derecha) {
+      reportar_error(FASE_SEMANTICA, nodo->linea,
+                     "La mezcla se cortó: no se puede comparar %s con %s usando "
+                     "'%s'.",
+                     tipo_nombre(izquierda), tipo_nombre(derecha),
+                     comparacion_texto(nodo->comparacion));
+      return nodo->tipo_dato;
+    }
+    nodo->tipo_dato = TIPO_PUNTO; /* toda comparacion da dorado o crudo */
+    return nodo->tipo_dato;
+  }
+
+  case NODO_LOGICA: {
+    TipoDato izquierda = analizar_expresion(nodo->hijos[0]);
+    TipoDato derecha = analizar_expresion(nodo->hijos[1]);
+    nodo->tipo_dato = TIPO_DESCONOCIDO;
+    if (izquierda == TIPO_DESCONOCIDO || derecha == TIPO_DESCONOCIDO) {
+      return nodo->tipo_dato;
+    }
+    if (izquierda != TIPO_PUNTO || derecha != TIPO_PUNTO) {
+      reportar_error(FASE_SEMANTICA, nodo->linea,
+                     "La mezcla se cortó: '%s' une dos condiciones (punto), no "
+                     "%s con %s.",
+                     nodo->logica == LOGICA_O ? "o" : "y ademas",
+                     tipo_nombre(izquierda), tipo_nombre(derecha));
+      return nodo->tipo_dato;
+    }
+    nodo->tipo_dato = TIPO_PUNTO;
+    return nodo->tipo_dato;
+  }
+
+  case NODO_NO: {
+    TipoDato interno = analizar_expresion(nodo->hijos[0]);
+    nodo->tipo_dato = TIPO_DESCONOCIDO;
+    if (interno == TIPO_DESCONOCIDO) return nodo->tipo_dato;
+    if (interno != TIPO_PUNTO) {
+      reportar_error(FASE_SEMANTICA, nodo->linea,
+                     "La mezcla se cortó: 'no' solo se usa con punto (dorado o "
+                     "crudo), no con %s.",
+                     tipo_nombre(interno));
+      return nodo->tipo_dato;
+    }
+    nodo->tipo_dato = TIPO_PUNTO;
+    return nodo->tipo_dato;
+  }
+
   default:
     break;
   }
@@ -285,11 +348,11 @@ static void analizar_declaracion(Nodo *nodo) {
     }
     return;
   }
-  if (preparacion_actual != NULL && tabla_buscar_global(mesa, nodo->nombre) >= 0) {
+  if (mesa->nivel_actual > 0 && tabla_buscar(mesa, nodo->nombre) >= 0) {
     reportar_advertencia(nodo->linea,
-                         "el molde '%s' de '%s' tapa al molde global del mismo "
-                         "nombre.",
-                         nodo->nombre, preparacion_actual->nombre);
+                         "el molde '%s' tapa a otro nombre igual de un ámbito "
+                         "de afuera.",
+                         nodo->nombre);
   }
   nodo->simbolo = tabla_insertar(mesa, nodo->nombre, nodo->tipo_declarado,
                                  nodo->es_secreto ? CAT_SECRETO : CAT_MOLDE,
@@ -413,13 +476,71 @@ static void analizar_entrega(Nodo *nodo) {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Listas de instrucciones y ambitos                                   */
+/* ------------------------------------------------------------------ */
+
+static int lista_siempre_entrega(Nodo *const *instrucciones, int cantidad);
+
+/*
+ * 1 si la instruccion SIEMPRE termina con una entrega, sin importar el
+ * camino: una entrega, o un si con sino donde los dos caminos entregan.
+ */
+static int siempre_entrega(const Nodo *instruccion) {
+  if (instruccion == NULL) return 0;
+  if (instruccion->clase == NODO_ENTREGA) return 1;
+  if (instruccion->clase == NODO_SI && instruccion->num_hijos == 3) {
+    const Nodo *entonces = instruccion->hijos[1];
+    const Nodo *sino = instruccion->hijos[2];
+    return lista_siempre_entrega(entonces->hijos, entonces->num_hijos) &&
+           lista_siempre_entrega(sino->hijos, sino->num_hijos);
+  }
+  return 0;
+}
+
+static int lista_siempre_entrega(Nodo *const *instrucciones, int cantidad) {
+  for (int i = 0; i < cantidad; i++) {
+    if (siempre_entrega(instrucciones[i])) return 1;
+  }
+  return 0;
+}
+
+/* Revisa una lista de instrucciones y avisa si hay codigo despues de una
+   entrega (nunca se ejecutaria). */
+static void analizar_lista(Nodo *const *instrucciones, int cantidad) {
+  int aviso_dado = 0;
+  for (int i = 0; i < cantidad; i++) {
+    if (i > 0 && !aviso_dado && siempre_entrega(instrucciones[i - 1])) {
+      reportar_advertencia(instrucciones[i]->linea,
+                           "esta instrucción está después de 'entrega' y nunca "
+                           "se ejecuta.");
+      aviso_dado = 1;
+    }
+    analizar_instruccion(instrucciones[i]);
+  }
+}
+
+/* Avisa de los nombres del ambito actual que nunca se usaron y lo cierra. */
+static void cerrar_ambito(const char *donde) {
+  for (int i = 0; i < mesa->cantidad; i++) {
+    Simbolo *s = &mesa->simbolos[i];
+    if (s->activo && s->nivel == mesa->nivel_actual && s->usos == 0 &&
+        s->categoria != CAT_PREPARACION) {
+      reportar_advertencia(s->linea_declaracion, "el %s '%s' de %s nunca se usa.",
+                           categoria_nombre(s->categoria), s->nombre, donde);
+    }
+  }
+  tabla_salir_ambito(mesa);
+}
+
 /* Regla 4: preparacion nombre(ingredientes) rinde <tipo>: pasos fin. */
 static void analizar_preparacion(Nodo *nodo) {
-  if (preparacion_actual != NULL) {
+  if (preparacion_actual != NULL || mesa->nivel_actual > 0) {
     reportar_error(FASE_SEMANTICA, nodo->linea,
-                   "No se puede declarar la preparación '%s' dentro de '%s': "
+                   "No se puede declarar la preparación '%s' dentro de %s: "
                    "las preparaciones van en la receta principal.",
-                   nodo->nombre, preparacion_actual->nombre);
+                   nodo->nombre,
+                   preparacion_actual != NULL ? "otra preparación" : "un si");
     return;
   }
   Simbolo *anterior = tabla_simbolo(mesa, tabla_buscar_global(mesa, nodo->nombre));
@@ -440,10 +561,21 @@ static void analizar_preparacion(Nodo *nodo) {
     return;
   }
 
+  /* Se registra ANTES de revisar los pasos, para que pueda llamarse a si
+     misma (recursion). Para detenerse necesita un 'si'. */
+  int posicion = tabla_insertar(mesa, nodo->nombre, nodo->tipo_declarado,
+                                CAT_PREPARACION, nodo->linea, 0);
+  Simbolo *simbolo = tabla_simbolo(mesa, posicion);
+  simbolo->num_ingredientes = ingredientes->num_hijos;
+  simbolo->definicion = nodo;
+  nodo->simbolo = posicion;
+
   /* Entra al ambito de la preparacion: sus ingredientes y moldes son locales. */
   tabla_entrar_ambito(mesa, nodo->nombre);
   preparacion_actual = nodo;
   entregas_encontradas = 0;
+  se_llama_a_si_misma = 0;
+  tiene_si = 0;
   int linea_guardada = linea_ultima_declaracion;
   linea_ultima_declaracion = 0;
 
@@ -457,8 +589,8 @@ static void analizar_preparacion(Nodo *nodo) {
     }
     if (tabla_buscar_global(mesa, ingrediente->nombre) >= 0) {
       reportar_advertencia(ingrediente->linea,
-                           "el ingrediente '%s' de '%s' tapa al molde global "
-                           "del mismo nombre.",
+                           "el ingrediente '%s' de '%s' tapa al nombre global "
+                           "igual.",
                            ingrediente->nombre, nodo->nombre);
     }
     ingrediente->simbolo =
@@ -466,48 +598,74 @@ static void analizar_preparacion(Nodo *nodo) {
                        CAT_INGREDIENTE, ingrediente->linea, 1);
   }
 
-  int aviso_codigo_muerto = 0;
-  for (int i = 0; i < pasos->num_hijos; i++) {
-    if (entregas_encontradas > 0 && !aviso_codigo_muerto) {
-      reportar_advertencia(pasos->hijos[i]->linea,
-                           "esta instrucción está después de 'entrega' en '%s' "
-                           "y nunca se ejecuta.",
-                           nodo->nombre);
-      aviso_codigo_muerto = 1;
+  analizar_lista(pasos->hijos, pasos->num_hijos);
+
+  if (nodo->tipo_declarado != TIPO_NADA &&
+      !lista_siempre_entrega(pasos->hijos, pasos->num_hijos)) {
+    if (entregas_encontradas == 0) {
+      reportar_error(FASE_SEMANTICA, nodo->linea,
+                     "La preparación '%s' rinde %s pero nunca entrega nada "
+                     "(falta  entrega <valor>.).",
+                     nodo->nombre, tipo_nombre(nodo->tipo_declarado));
+    } else {
+      reportar_error(FASE_SEMANTICA, nodo->linea,
+                     "La preparación '%s' rinde %s pero puede terminar sin "
+                     "entregar: revisa que el 'si' tenga 'sino' y que todos los "
+                     "caminos tengan entrega.",
+                     nodo->nombre, tipo_nombre(nodo->tipo_declarado));
     }
-    analizar_instruccion(pasos->hijos[i]);
   }
 
-  if (nodo->tipo_declarado != TIPO_NADA && entregas_encontradas == 0) {
+  if (se_llama_a_si_misma && !tiene_si) {
     reportar_error(FASE_SEMANTICA, nodo->linea,
-                   "La preparación '%s' rinde %s pero nunca entrega nada "
-                   "(falta  entrega <valor>.).",
-                   nodo->nombre, tipo_nombre(nodo->tipo_declarado));
+                   "La preparación '%s' se llama a sí misma pero no tiene ningún "
+                   "'si' para detenerse: se repetiría para siempre.",
+                   nodo->nombre);
   }
 
-  /* Avisos de ingredientes y moldes locales sin usar (antes de salir). */
-  for (int i = 0; i < mesa->cantidad; i++) {
-    Simbolo *s = &mesa->simbolos[i];
-    if (s->activo && s->nivel == 1 && s->usos == 0) {
-      reportar_advertencia(s->linea_declaracion,
-                           "el %s '%s' de '%s' nunca se usa.",
-                           categoria_nombre(s->categoria), s->nombre,
-                           nodo->nombre);
-    }
-  }
-
-  tabla_salir_ambito(mesa);
+  char donde[96];
+  snprintf(donde, sizeof(donde), "'%s'", nodo->nombre);
+  cerrar_ambito(donde);
   preparacion_actual = NULL;
   linea_ultima_declaracion = linea_guardada;
 
-  /* Se registra DESPUES de revisar los pasos: por eso no puede usarse
-     a si misma (no hay condicionales, se repetiria para siempre). */
-  int posicion = tabla_insertar(mesa, nodo->nombre, nodo->tipo_declarado,
-                                CAT_PREPARACION, nodo->linea, 0);
-  Simbolo *simbolo = tabla_simbolo(mesa, posicion);
-  simbolo->num_ingredientes = ingredientes->num_hijos;
-  simbolo->definicion = nodo;
-  nodo->simbolo = posicion;
+  /* Los locales de la preparacion son los simbolos creados despues de ella;
+     el interprete los guarda y restaura en cada llamada (recursion). */
+  simbolo = tabla_simbolo(mesa, posicion);
+  simbolo->primer_local = posicion + 1;
+  simbolo->num_locales = mesa->cantidad - (posicion + 1);
+}
+
+/* Regla 5: si <condicion>: ... [sino ...] fin. */
+static void analizar_si(Nodo *nodo) {
+  Nodo *condicion = nodo->hijos[0];
+  Nodo *entonces = nodo->hijos[1];
+  Nodo *sino = nodo->num_hijos > 2 ? nodo->hijos[2] : NULL;
+
+  tiene_si = 1;
+  TipoDato tipo = analizar_expresion(condicion);
+  if (tipo != TIPO_DESCONOCIDO && tipo != TIPO_PUNTO) {
+    reportar_error(FASE_SEMANTICA, nodo->linea,
+                   "La condición del 'si' tiene que ser punto (dorado o crudo) y "
+                   "aquí es %s. Usa una comparación, por ejemplo: si huevos "
+                   "mayor que 2:",
+                   tipo_nombre(tipo));
+  }
+
+  /* Cada bloque tiene su propio ambito: lo que se declara adentro solo
+     existe adentro. */
+  char nombre[32];
+  snprintf(nombre, sizeof(nombre), "si L%d", nodo->linea);
+  tabla_entrar_ambito(mesa, nombre);
+  analizar_lista(entonces->hijos, entonces->num_hijos);
+  cerrar_ambito("este si");
+
+  if (sino != NULL) {
+    snprintf(nombre, sizeof(nombre), "sino L%d", sino->linea);
+    tabla_entrar_ambito(mesa, nombre);
+    analizar_lista(sino->hijos, sino->num_hijos);
+    cerrar_ambito("este sino");
+  }
 }
 
 static void analizar_instruccion(Nodo *instruccion) {
@@ -531,6 +689,9 @@ static void analizar_instruccion(Nodo *instruccion) {
   case NODO_LLAMADA:
     analizar_llamada(instruccion, 0);
     break;
+  case NODO_SI:
+    analizar_si(instruccion);
+    break;
   default:
     break;
   }
@@ -542,9 +703,7 @@ int analizar_semantica(Nodo *receta, TablaSimbolos *tabla) {
   linea_ultima_declaracion = 0;
   preparacion_actual = NULL;
 
-  for (int i = 0; i < receta->num_hijos; i++) {
-    analizar_instruccion(receta->hijos[i]);
-  }
+  analizar_lista(receta->hijos, receta->num_hijos);
 
   /* Advertencias: no detienen la compilacion. Si ya hay errores no se
      muestran, para no llenar la pantalla. */

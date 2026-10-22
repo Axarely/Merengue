@@ -17,7 +17,7 @@ static Resultado ejecutar_instrucciones(Nodo *const *instrucciones, int cantidad
 static int llamar_preparacion(const Nodo *llamada, Valor *salida);
 
 /* Limite de preparaciones abiertas a la vez (una dentro de otra). */
-#define PROFUNDIDAD_MAXIMA 200
+#define PROFUNDIDAD_MAXIMA 1000
 static int profundidad;
 
 /* Convierte un valor al tipo del molde (unica conversion: porciones -> tazas). */
@@ -153,6 +153,69 @@ static int evaluar(const Nodo *nodo, Valor *salida) {
   case NODO_LLAMADA:
     return llamar_preparacion(nodo, salida);
 
+  case NODO_COMPARACION: {
+    Valor izquierda, derecha;
+    if (!evaluar(nodo->hijos[0], &izquierda)) return 0;
+    if (!evaluar(nodo->hijos[1], &derecha)) {
+      valor_liberar(&izquierda);
+      return 0;
+    }
+    int resultado = 0;
+    if (tipo_es_numerico(izquierda.tipo)) {
+      /* porciones y tazas se comparan como decimales: 3 igual a 3,0 */
+      double a = como_decimal(&izquierda), b = como_decimal(&derecha);
+      switch (nodo->comparacion) {
+      case COMP_MAYOR: resultado = a > b; break;
+      case COMP_MENOR: resultado = a < b; break;
+      case COMP_MAYOR_IGUAL: resultado = a >= b; break;
+      case COMP_MENOR_IGUAL: resultado = a <= b; break;
+      case COMP_IGUAL: resultado = a == b; break;
+      case COMP_DISTINTO: resultado = a != b; break;
+      }
+    } else {
+      /* igual a / distinto de entre betun, chispa o punto */
+      int iguales = 0;
+      switch (izquierda.tipo) {
+      case TIPO_BETUN: iguales = strcmp(izquierda.betun, derecha.betun) == 0; break;
+      case TIPO_CHISPA: iguales = izquierda.chispa == derecha.chispa; break;
+      case TIPO_PUNTO: iguales = izquierda.punto == derecha.punto; break;
+      default: break;
+      }
+      resultado = nodo->comparacion == COMP_DISTINTO ? !iguales : iguales;
+    }
+    valor_liberar(&izquierda);
+    valor_liberar(&derecha);
+    salida->tipo = TIPO_PUNTO;
+    salida->punto = resultado;
+    return 1;
+  }
+
+  case NODO_LOGICA: {
+    Valor izquierda, derecha;
+    if (!evaluar(nodo->hijos[0], &izquierda)) return 0;
+    salida->tipo = TIPO_PUNTO;
+    /* Corto circuito: si ya se sabe el resultado, no se evalua la derecha. */
+    if (nodo->logica == LOGICA_O && izquierda.punto) {
+      salida->punto = 1;
+      return 1;
+    }
+    if (nodo->logica == LOGICA_Y && !izquierda.punto) {
+      salida->punto = 0;
+      return 1;
+    }
+    if (!evaluar(nodo->hijos[1], &derecha)) return 0;
+    salida->punto = derecha.punto;
+    return 1;
+  }
+
+  case NODO_NO: {
+    Valor interno;
+    if (!evaluar(nodo->hijos[0], &interno)) return 0;
+    salida->tipo = TIPO_PUNTO;
+    salida->punto = !interno.punto;
+    return 1;
+  }
+
   default:
     break;
   }
@@ -270,7 +333,9 @@ static int llamar_preparacion(const Nodo *llamada, Valor *salida) {
 
   if (profundidad >= PROFUNDIDAD_MAXIMA) {
     reportar_error(FASE_EJECUCION, llamada->linea,
-                   "demasiadas preparaciones abiertas una dentro de otra.");
+                   "la preparación '%s' se llamó demasiadas veces una dentro "
+                   "de otra (más de %d). ¿Le falta un 'si' para detenerse?",
+                   preparacion->nombre, PROFUNDIDAD_MAXIMA);
     return 0;
   }
 
@@ -281,6 +346,22 @@ static int llamar_preparacion(const Nodo *llamada, Valor *salida) {
     if (!evaluar(llamada->hijos[i], &argumentos[i])) {
       for (int j = 0; j < i; j++) valor_liberar(&argumentos[j]);
       return 0;
+    }
+  }
+
+  /* Recursion: si la preparacion ya estaba corriendo, sus moldes locales
+     tienen valores de esa llamada. Se guardan para devolverlos al final. */
+  int num_locales = preparacion->num_locales;
+  Valor *guardados = NULL;
+  if (num_locales > 0) {
+    guardados = calloc((size_t)num_locales, sizeof(*guardados));
+    if (guardados == NULL) {
+      fprintf(stderr, "Sin memoria\n");
+      exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < num_locales; i++) {
+      Simbolo *local = tabla_simbolo(mesa, preparacion->primer_local + i);
+      valor_asignar(&guardados[i], &local->valor);
     }
   }
 
@@ -301,8 +382,23 @@ static int llamar_preparacion(const Nodo *llamada, Valor *salida) {
   Resultado resultado =
       ejecutar_instrucciones(pasos->hijos, pasos->num_hijos, &entregado);
   profundidad--;
+
+  /* Devuelve los moldes locales a como estaban antes de esta llamada. */
+  for (int i = 0; i < num_locales; i++) {
+    Simbolo *local = tabla_simbolo(mesa, preparacion->primer_local + i);
+    valor_asignar(&local->valor, &guardados[i]);
+    valor_liberar(&guardados[i]);
+  }
+  free(guardados);
+
   if (resultado == EJ_ERROR) {
     valor_liberar(&entregado);
+    return 0;
+  }
+  if (preparacion->tipo != TIPO_NADA && entregado.tipo == TIPO_NADA) {
+    reportar_error(FASE_EJECUCION, llamada->linea,
+                   "la preparación '%s' terminó sin entregar un valor.",
+                   preparacion->nombre);
     return 0;
   }
 
@@ -341,6 +437,23 @@ static Resultado ejecutar_instrucciones(Nodo *const *instrucciones, int cantidad
     case NODO_PREPARACION:
       /* Solo es la definicion: se ejecuta cuando alguien la llama. */
       break;
+    case NODO_SI: {
+      /* Regla 5: se evalua la condicion y se corre uno de los dos bloques. */
+      Valor condicion;
+      if (!evaluar(instruccion->hijos[0], &condicion)) return EJ_ERROR;
+      const Nodo *bloque = NULL;
+      if (condicion.punto) {
+        bloque = instruccion->hijos[1];
+      } else if (instruccion->num_hijos > 2) {
+        bloque = instruccion->hijos[2];
+      }
+      if (bloque != NULL) {
+        Resultado r = ejecutar_instrucciones(bloque->hijos, bloque->num_hijos,
+                                             entregado);
+        if (r != EJ_OK) return r; /* error, o una entrega dentro del si */
+      }
+      break;
+    }
     default:
       break;
     }

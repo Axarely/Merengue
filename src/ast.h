@@ -33,8 +33,27 @@ typedef enum {
   NODO_INGREDIENTE,   /* un parametro: <tipo> <nombre>                */
   NODO_PASOS,         /* cuerpo de una preparacion                    */
   NODO_ENTREGA,       /* entrega expr.   /   entrega.                 */
-  NODO_LLAMADA        /* nombre(arg y arg ...)                        */
+  NODO_LLAMADA,       /* nombre(arg y arg ...)                        */
+
+  /* Condicionales (Regla 5) */
+  NODO_SI,            /* si cond: ... [sino ...] fin.                 */
+  NODO_ENTONCES,      /* instrucciones que corren si es dorado        */
+  NODO_SINO,          /* instrucciones que corren si es crudo         */
+  NODO_COMPARACION,   /* a mayor que b, a igual a b, ...              */
+  NODO_LOGICA,        /* a o b,  a y ademas b                         */
+  NODO_NO             /* no a                                         */
 } TipoNodo;
+
+typedef enum {
+  COMP_MAYOR,       /* mayor que          >  */
+  COMP_MENOR,       /* menor que          <  */
+  COMP_MAYOR_IGUAL, /* mayor o igual que  >= */
+  COMP_MENOR_IGUAL, /* menor o igual que  <= */
+  COMP_IGUAL,       /* igual a            == */
+  COMP_DISTINTO     /* distinto de        != */
+} TipoComparacion;
+
+typedef enum { LOGICA_O, LOGICA_Y } TipoLogica;
 
 typedef enum { ASIG_VIERTE, ASIG_ESPOLVOREA, ASIG_RASPA } TipoAsignacion;
 
@@ -59,6 +78,8 @@ typedef struct Nodo {
   TipoAsignacion asignacion;
   char operador;           /* '+', '-', '*', '/' en NODO_OPERACION */
   TipoFuncion funcion;
+  TipoComparacion comparacion; /* NODO_COMPARACION */
+  TipoLogica logica;           /* NODO_LOGICA */
 
   /* Valor de un NODO_LITERAL. */
   union {
@@ -107,6 +128,17 @@ Nodo *nodo_llamada(int linea, const char *nombre, Nodo *argumentos);
 /* La lista de argumentos se arma en un nodo temporal; nodo_llamada toma
    sus hijos y lo libera. */
 Nodo *nodo_lista_temporal(void);
+
+/* Condicionales: si cond: entonces [sino ...] fin. (sino puede ser NULL) */
+Nodo *nodo_si(int linea, Nodo *condicion, Nodo *entonces, Nodo *sino);
+/* Convierte una lista de pasos en un bloque Entonces o Sino. */
+Nodo *nodo_bloque(TipoNodo clase, Nodo *pasos);
+Nodo *nodo_comparacion(int linea, TipoComparacion comparacion, Nodo *izquierda,
+                       Nodo *derecha);
+Nodo *nodo_logica(int linea, TipoLogica logica, Nodo *izquierda, Nodo *derecha);
+Nodo *nodo_no(int linea, Nodo *expresion);
+
+const char *comparacion_texto(TipoComparacion comparacion);
 
 void nodo_agregar_hijo(Nodo *padre, Nodo *hijo);
 

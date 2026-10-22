@@ -9,3 +9,5 @@ molde betun mensaje con "hola".        ~ esta linea esta bien
 preparacion galleta(porciones n) tazas:     ~ falta 'rinde' antes del tipo
     entrega n.
 fin.
+si dorado:                             ~ a este si le falta su 'fin.'
+    sirve "sin fin".

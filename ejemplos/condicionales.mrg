@@ -1,0 +1,74 @@
+~ =============================================================
+~  Receta: horneado con decisiones (Regla 5: si / sino)
+~  Las comparaciones se escriben con palabras:
+~    mayor que, menor que, mayor o igual que, menor o igual que,
+~    igual a, distinto de
+~  y se unen con:  o,  y ademas,  no
+~ =============================================================
+
+molde porciones huevos con 4.
+molde tazas harina con 2,5.
+molde betun sabor con "chocolate".
+molde chispa talla con 'M'.
+
+~ ---- si / sino ----
+si huevos mayor que 3:
+    sirve "Hay suficientes huevos".
+sino:
+    sirve "Faltan huevos".
+fin.
+
+~ ---- si / sino si / sino (varias opciones) ----
+si harina menor que 1,0:
+    sirve "Muy poca harina".
+sino si harina menor o igual que 2,5:
+    sirve "Harina justa".
+sino:
+    sirve "Sobra harina".
+fin.
+
+~ ---- comparar texto, chispa y unir condiciones ----
+si sabor igual a "chocolate" y ademas talla distinto de 'S':
+    sirve "Pastel de chocolate mediano o grande".
+fin.
+
+~ ---- una comparacion da un punto (dorado o crudo) ----
+molde punto listo con huevos mayor o igual que 2 o harina mayor que 3,0.
+sirve listo.
+si no listo:
+    sirve "Todavia no se puede hornear".
+sino:
+    sirve "A hornear!".
+fin.
+
+~ ---- un si dentro de una preparacion ----
+preparacion temperatura(betun tipo_de_pastel) rinde porciones:
+    si tipo_de_pastel igual a "merengue":
+        entrega 100.
+    sino si tipo_de_pastel igual a "pan":
+        entrega 200.
+    sino:
+        entrega 180.
+    fin.
+fin.
+
+sirve temperatura("merengue").
+sirve temperatura("pan").
+sirve temperatura(sabor).
+
+~ ---- recursion: una preparacion que se llama a si misma ----
+~ El 'si' es lo que la detiene. Capas de un pastel: 1 + 2 + ... + n
+preparacion capas_totales(porciones pisos) rinde porciones:
+    si pisos menor o igual que 1:
+        entrega 1.
+    fin.
+    entrega pisos + capas_totales(pisos - 1).
+fin.
+
+sirve capas_totales(5).
+
+~ ---- los moldes declarados dentro de un si solo existen ahi ----
+si huevos igual a 4:
+    molde betun aviso con "Cuatro huevos exactos".
+    sirve aviso.
+fin.

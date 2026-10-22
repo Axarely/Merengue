@@ -18,7 +18,8 @@ receta.mrg ──► Léxico ──► Sintáctico ──► Semántico ──�
 - No existe el `=`. El valor va **primero** y el molde **después**: `vierte 5 en huevos.`
 - Los comentarios empiezan con `~`, el remolino de la manga pastelera.
 - Los tipos son fijos y estrictos. Solo existe una conversión automática: de `porciones` a `tazas`.
-- Tiene **preparaciones** (funciones) con ingredientes (parámetros), `rinde` (tipo de retorno), `entrega` (return) y ámbitos locales.
+- Tiene **preparaciones** (funciones) con ingredientes (parámetros), `rinde` (tipo de retorno), `entrega` (return), ámbitos locales y recursión.
+- Tiene **condicionales** (`si` / `sino si` / `sino`) con comparaciones escritas con palabras: `mayor que`, `igual a`, `distinto de`...
 - Los mensajes de error usan el tema de la repostería: *"Ese molde no está en la mesa"*, *"La mezcla se cortó"*.
 - Los archivos usan la extensión `.mrg`.
 
@@ -32,7 +33,7 @@ receta.mrg ──► Léxico ──► Sintáctico ──► Semántico ──�
 4. Tienen un máximo de 30 caracteres.
 5. No pueden ser palabras reservadas.
 
-**Palabras reservadas:** `molde`, `secreto`, `con`, `vierte`, `en`, `espolvorea`, `raspa`, `a`, `sirve`, `porciones`, `tazas`, `betun`, `chispa`, `punto`, `dorado`, `crudo`, `degustar`, `rebanar`, `preparacion`, `rinde`, `nada`, `entrega`, `fin`, `y`.
+**Palabras reservadas:** `molde`, `secreto`, `con`, `vierte`, `en`, `espolvorea`, `raspa`, `a`, `sirve`, `porciones`, `tazas`, `betun`, `chispa`, `punto`, `dorado`, `crudo`, `degustar`, `rebanar`, `preparacion`, `rinde`, `nada`, `entrega`, `fin`, `y`, `si`, `sino`, `o`, `no`, y las frases `mayor que`, `menor que`, `mayor o igual que`, `menor o igual que`, `igual a`, `distinto de`, `y ademas`.
 
 ### Regla 1: Declaración de variables
 
@@ -119,10 +120,69 @@ Reglas:
 4. Una preparación que `rinde nada` puede terminar con `entrega.` sin valor, o simplemente llegar a `fin.`
 5. Al llamarla hay que darle **la misma cantidad** de ingredientes, del tipo correcto y en el mismo orden.
 6. Una preparación que rinde nada no se puede usar como valor: `molde betun b con decorar("Ana").` da error.
-7. Debe declararse **antes** de usarse, y **no puede usarse a sí misma**. Merengue no tiene condiciones, así que una preparación que se llama a sí misma se repetiría para siempre.
+7. Debe declararse **antes** de usarse. **Puede llamarse a sí misma** (recursión), pero entonces necesita un `si` para detenerse; si no lo tiene, el compilador da error porque se repetiría para siempre.
 8. Las preparaciones solo se declaran en la receta principal, no dentro de otra preparación.
 9. **Ámbitos:** los ingredientes y los moldes declarados dentro de una preparación son **locales**: solo existen dentro de ella. Desde una preparación sí se pueden usar los moldes globales declarados antes.
 10. `entrega` solo se usa dentro de una preparación. Lo que esté después de `entrega` nunca se ejecuta (el compilador avisa).
+
+### Regla 5: Condicionales (si)
+
+El `si` decide qué pasos seguir según una **condición**. La condición tiene que ser de tipo `punto` (`dorado` o `crudo`).
+
+```
+si <condición>:
+    <pasos si es dorado>
+sino si <otra condición>:      ~ opcional, se puede repetir
+    <pasos>
+sino:                          ~ opcional
+    <pasos si es crudo>
+fin.
+```
+
+```
+si huevos mayor que 3:
+    sirve "Hay suficientes huevos".
+sino si huevos igual a 3:
+    sirve "Justo los necesarios".
+sino:
+    sirve "Faltan huevos".
+fin.
+```
+
+**Comparaciones.** Se escriben con palabras y siempre dan un `punto`:
+
+| Merengue | En C | Funciona con |
+| --- | --- | --- |
+| `mayor que` | `>` | porciones y tazas |
+| `menor que` | `<` | porciones y tazas |
+| `mayor o igual que` | `>=` | porciones y tazas |
+| `menor o igual que` | `<=` | porciones y tazas |
+| `igual a` | `==` | dos valores del mismo tipo (porciones y tazas se pueden mezclar) |
+| `distinto de` | `!=` | dos valores del mismo tipo (porciones y tazas se pueden mezclar) |
+
+**Operadores lógicos:** `o` (`||` en C), `y ademas` (`&&`) y `no` (`!`). Unen o invierten condiciones:
+
+```
+molde punto listo con huevos mayor o igual que 2 y ademas harina mayor que 1,0.
+si no listo:
+    sirve "Todavía no".
+fin.
+```
+
+Reglas:
+
+1. La condición tiene que ser `punto`. `si huevos:` da error; hay que escribir una comparación, como `si huevos mayor que 0:`.
+2. `mayor que`, `menor que` y sus variantes solo comparan números (`porciones` y `tazas`).
+3. `igual a` y `distinto de` comparan dos valores del mismo tipo: `betun` con `betun`, `chispa` con `chispa`, `punto` con `punto`, o números entre sí.
+4. `o`, `y ademas` y `no` solo trabajan con `punto`.
+5. No se pueden encadenar comparaciones (`1 menor que x menor que 5`); se unen con `y ademas`.
+6. Los símbolos `>`, `<`, `==` y `!=` no existen en Merengue; el analizador léxico dice qué palabra usar.
+7. **Ámbito de bloque:** lo que se declara dentro de un `si` o de un `sino` solo existe ahí adentro. En la tabla de símbolos su ámbito aparece como `si L12` o `sino L14`.
+8. Un `si` puede ir dentro de una preparación y tener `entrega`. Si la preparación rinde un tipo, **todos los caminos** tienen que entregar: un `si` sin `sino` no basta.
+9. Las preparaciones no se pueden declarar dentro de un `si`.
+10. `o` y `y ademas` hacen **corto circuito**: si con el lado izquierdo ya se sabe el resultado, el derecho no se calcula.
+
+Precedencia, de menor a mayor: `o` → `y ademas` → `no` → comparaciones → `+ -` → `* /` → signo `-`.
 
 ### Instrucción de salida
 
@@ -203,7 +263,7 @@ En Windows, abre la carpeta desde WSL (`code .` dentro de la terminal de Ubuntu)
 | --- | --- | --- | --- |
 | 1. Análisis léxico | `src/lexico.l` | Agrupa los caracteres en tokens y rechaza los que no existen en Merengue | Tabla de tokens |
 | 2. Análisis sintáctico | `src/sintactico.y` | Revisa que los tokens sigan la gramática y construye el AST | Árbol AST |
-| 3. Análisis semántico | `src/semantico.c` | Revisa el significado: declaraciones, constantes, tipos, ámbitos y llamadas a preparaciones. Anota el tipo de cada nodo del AST | Tabla AST y tabla de símbolos |
+| 3. Análisis semántico | `src/semantico.c` | Revisa el significado: declaraciones, constantes, tipos, ámbitos, llamadas a preparaciones y condiciones del `si`. Anota el tipo de cada nodo del AST | Tabla AST y tabla de símbolos |
 | 4. Ejecución | `src/interprete.c` | Recorre el AST y "hornea" la receta | Salida del programa |
 
 Archivos de apoyo:
@@ -211,7 +271,7 @@ Archivos de apoyo:
 | Archivo | Contenido |
 | --- | --- |
 | `src/ast.c` | Nodos del AST, dibujo del árbol y tabla AST |
-| `src/tabla_simbolos.c` | Tabla de símbolos ("la mesa de moldes") con ámbitos: global o el nombre de cada preparación |
+| `src/tabla_simbolos.c` | Tabla de símbolos ("la mesa de moldes") con una pila de ámbitos: global, cada preparación y cada bloque de un `si` |
 | `src/tokens.c` | Registro de tokens para la tabla léxica |
 | `src/errores.c` | Errores y advertencias de cada fase |
 | `src/tipos.c` | Los cinco tipos de dato y su equivalente en C |
@@ -224,7 +284,7 @@ Archivos de apoyo:
 receta        → instrucciones
 instrucciones → instrucciones instruccion | ε
 instruccion   → declaracion '.' | asignacion '.' | salida '.'
-              | preparacion | llamada '.' | entrega '.'
+              | preparacion | llamada '.' | entrega '.' | condicional
 declaracion   → molde TIPO NOMBRE
               | molde TIPO NOMBRE con expresion
               | molde secreto TIPO NOMBRE
@@ -239,15 +299,22 @@ pasos         → pasos instruccion | ε
 entrega       → entrega expresion | entrega
 llamada       → NOMBRE '(' argumentos ')'
 argumentos    → expresion (y expresion)* | ε
+condicional   → si expresion ':' pasos resto_si
+resto_si      → fin '.'
+              | sino ':' pasos fin '.'
+              | sino si expresion ':' pasos resto_si
 expresion     → expresion '+' expresion | expresion '-' expresion
               | expresion '*' expresion | expresion '/' expresion
               | '-' expresion | '(' expresion ')'
               | degustar '(' expresion ')' | rebanar '(' expresion ')'
               | llamada
               | NOMBRE | PORCIONES | TAZAS | BETUN | CHISPA | PUNTO
+              | expresion (mayor que | menor que | mayor o igual que
+                           | menor o igual que | igual a | distinto de) expresion
+              | expresion o expresion | expresion y ademas expresion | no expresion
 ```
 
-La precedencia se declara en Bison con `%left '+' '-'`, `%left '*' '/'` y `%precedence NEGATIVO`. Los paréntesis no crean un nodo en el AST: su efecto queda en la forma del árbol.
+La precedencia se declara en Bison con `%left o`, `%left y ademas`, `%precedence no`, `%nonassoc` para las comparaciones (por eso no se pueden encadenar), `%left '+' '-'`, `%left '*' '/'` y `%precedence NEGATIVO`. Los paréntesis no crean un nodo en el AST: su efecto queda en la forma del árbol.
 
 La gramática acepta `molde secreto TIPO NOMBRE` sin `con` a propósito. Esa forma es sintácticamente correcta, pero el analizador semántico la rechaza con un mensaje claro.
 
@@ -270,7 +337,15 @@ La gramática acepta `molde secreto TIPO NOMBRE` sin `con` a propósito. Esa for
 | Semántica | rinde porciones y no entrega | nunca entrega nada |
 | Semántica | usar como valor algo que rinde nada | rinde nada: no se puede usar como valor |
 | Semántica | usar un molde local fuera de su preparación | Ese molde no está en la mesa |
+| Léxica | `huevos > 2` | usa 'mayor que' |
+| Sintáctica | `si` sin `fin.` | falta 'fin.' para cerrar el si |
+| Sintáctica | `x mayor que 1 mayor que 2` | no se pueden encadenar comparaciones |
+| Semántica | `si huevos:` | la condición del 'si' tiene que ser punto |
+| Semántica | `huevos mayor que "tres"` | 'mayor que' solo compara porciones y tazas |
+| Semántica | preparación que rinde y su `si` no tiene `sino` | puede terminar sin entregar |
+| Semántica | preparación que se llama a sí misma sin `si` | se repetiría para siempre |
 | Ejecución | dividir entre un molde que vale 0 | No se puede repartir entre cero |
+| Ejecución | recursión de más de 1000 llamadas | ¿Le falta un 'si' para detenerse? |
 
 Cada fase reporta todos los errores que encuentra, con su número de línea. El analizador sintáctico se recupera con la regla `error '.'` y sigue revisando la siguiente instrucción.
 
@@ -285,6 +360,8 @@ Cada fase reporta todos los errores que encuentra, con su número de línea. El 
 | `ejemplos/errores_semanticos.mrg` | Errores del analizador semántico |
 | `ejemplos/preparaciones.mrg` | Preparaciones (funciones): ingredientes, `rinde`, `entrega`, `rinde nada`, ámbitos y llamadas anidadas |
 | `ejemplos/errores_preparaciones.mrg` | Errores semánticos de las preparaciones |
+| `ejemplos/condicionales.mrg` | `si` / `sino si` / `sino`, comparaciones, `o` / `y ademas` / `no`, `si` dentro de una preparación, recursión y ámbito de bloque |
+| `ejemplos/errores_condicionales.mrg` | Errores semánticos del `si` |
 | `ejemplos/error_ejecucion.mrg` | Un error que solo aparece al ejecutar |
 
 ## Estructura del repositorio

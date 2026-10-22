@@ -46,6 +46,8 @@ static int linea_token_actual = 1;
 %option noinput
 
 LETRA        [A-Za-z]
+ESP          [ \t]+
+FIN_PALABRA  [^A-Za-z0-9_\x80-\xff]
 DIGITO       [0-9]
 NO_ASCII     [\x80-\xff]
 
@@ -71,6 +73,24 @@ NO_ASCII     [\x80-\xff]
 "entrega"                   { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_ENTREGA); }
 "fin"                       { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_FIN); }
 "y"                         { REGISTRAR("SEPARADOR"); ENTREGAR(T_Y); }
+
+ /* Condicionales (Regla 5) */
+"si"                        { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_SI); }
+"sino"                      { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_SINO); }
+
+ /* Comparaciones: se escriben con palabras. La parte "/{FIN_PALABRA}"
+    revisa que la ultima palabra termine ahi (asi "mayor quesos" no cuenta). */
+"mayor"{ESP}"que"/{FIN_PALABRA}                   { REGISTRAR("COMPARACION"); ENTREGAR(T_MAYOR); }
+"menor"{ESP}"que"/{FIN_PALABRA}                   { REGISTRAR("COMPARACION"); ENTREGAR(T_MENOR); }
+"mayor"{ESP}"o"{ESP}"igual"{ESP}"que"/{FIN_PALABRA} { REGISTRAR("COMPARACION"); ENTREGAR(T_MAYOR_IGUAL); }
+"menor"{ESP}"o"{ESP}"igual"{ESP}"que"/{FIN_PALABRA} { REGISTRAR("COMPARACION"); ENTREGAR(T_MENOR_IGUAL); }
+"igual"{ESP}"a"/{FIN_PALABRA}                     { REGISTRAR("COMPARACION"); ENTREGAR(T_IGUAL); }
+"distinto"{ESP}"de"/{FIN_PALABRA}                 { REGISTRAR("COMPARACION"); ENTREGAR(T_DISTINTO); }
+
+ /* Operadores logicos */
+"o"                         { REGISTRAR("OPERADOR_LOGICO"); ENTREGAR(T_O); }
+"y"{ESP}"ademas"/{FIN_PALABRA} { REGISTRAR("OPERADOR_LOGICO"); ENTREGAR(T_Y_ADEMAS); }
+"no"                        { REGISTRAR("OPERADOR_LOGICO"); ENTREGAR(T_NO); }
 
 "degustar"                  { REGISTRAR("FUNCION_INTEGRADA"); ENTREGAR(T_DEGUSTAR); }
 "rebanar"                   { REGISTRAR("FUNCION_INTEGRADA"); ENTREGAR(T_REBANAR); }
@@ -198,6 +218,25 @@ NO_ASCII     [\x80-\xff]
                                 "los ingredientes se separan con 'y'");
                               REGISTRAR("ERROR_LEXICO");
                               ENTREGAR(T_Y);
+                            }
+
+ /* Simbolos de comparacion: no existen en Merengue, se explica la palabra. */
+">="|"<="|"=="|"!="|">"|"<"  {
+                              const char *palabra =
+                                strcmp(yytext, ">=") == 0 ? "mayor o igual que" :
+                                strcmp(yytext, "<=") == 0 ? "menor o igual que" :
+                                strcmp(yytext, "==") == 0 ? "igual a" :
+                                strcmp(yytext, "!=") == 0 ? "distinto de" :
+                                strcmp(yytext, ">") == 0 ? "mayor que" : "menor que";
+                              reportar_error(FASE_LEXICA, yylineno,
+                                "'%s' no se usa en Merengue: las comparaciones se escriben con palabras, usa '%s'",
+                                yytext, palabra);
+                              REGISTRAR("ERROR_LEXICO");
+                              ENTREGAR(strcmp(yytext, ">=") == 0 ? T_MAYOR_IGUAL :
+                                       strcmp(yytext, "<=") == 0 ? T_MENOR_IGUAL :
+                                       strcmp(yytext, "==") == 0 ? T_IGUAL :
+                                       strcmp(yytext, "!=") == 0 ? T_DISTINTO :
+                                       strcmp(yytext, ">") == 0 ? T_MAYOR : T_MENOR);
                             }
 
 ";"                         {

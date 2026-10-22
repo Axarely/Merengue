@@ -1,0 +1,40 @@
+~ Errores SEMANTICOS del si (Regla 5)
+molde porciones huevos con 3.
+molde betun sabor con "vainilla".
+
+si huevos:                                  ~ la condicion tiene que ser punto
+    sirve 1.
+fin.
+
+si huevos mayor que "tres":                 ~ mayor que solo compara numeros
+    sirve 2.
+fin.
+
+si sabor igual a 'v':                       ~ no se compara betun con chispa
+    sirve 3.
+fin.
+
+si no huevos:                               ~ 'no' solo va con punto
+    sirve 4.
+fin.
+
+si huevos mayor que 1 y ademas 5:           ~ 'y ademas' une dos condiciones
+    sirve 5.
+fin.
+
+si huevos igual a 3:
+    molde betun aviso con "tres huevos".
+fin.
+sirve aviso.                                ~ aviso solo existe dentro del si
+
+preparacion porcion(porciones n) rinde porciones:   ~ si n vale 1 o menos, no entrega
+    si n mayor que 1:
+        entrega n / 2.
+    fin.
+fin.
+
+si dorado:
+    preparacion adorno() rinde nada:         ~ las preparaciones no van dentro de un si
+        sirve "adorno".
+    fin.
+fin.
