@@ -1,0 +1,4 @@
+~ Error en EJECUCION: pedir una posicion que no existe
+molde bandeja de porciones huevos con [10 y 20 y 30].
+sirve huevos[2].                   ~ 30: la ultima posicion es 2
+sirve huevos[3].                   ~ no existe: van de 0 a 2

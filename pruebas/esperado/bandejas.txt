@@ -1,0 +1,9 @@
+[10 y 20 y 30]
+20
+3
+[10 y 25 y 30 y 40]
+40
+40
+3
+["chocolate" y "vainilla"]
+codigo de salida: 0

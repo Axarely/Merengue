@@ -1,0 +1,11 @@
+~ Errores SEMANTICOS de las bandejas (Regla 6)
+molde bandeja de porciones huevos con [1 y "dos" y 3].   ~ "dos" no es porciones
+molde bandeja de tazas harina con [1,5 y 2,0].
+molde porciones normal con 5.
+
+sirve huevos[1,5].                 ~ la posicion tiene que ser porciones
+agrega "tres" a harina.            ~ la bandeja es de tazas
+vierte 4 en huevos.                ~ huevos es una bandeja: falta la posicion
+sirve huevos + 1.                  ~ huevos es una bandeja, no un numero
+sirve cuantos(normal).             ~ normal no es una bandeja
+agrega 1 a galletas.               ~ galletas no existe

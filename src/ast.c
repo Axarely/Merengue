@@ -160,9 +160,8 @@ Nodo *nodo_entrega(int linea, Nodo *valor) {
 
 Nodo *nodo_lista_temporal(void) { return nodo_nuevo(NODO_PASOS, 0); }
 
-Nodo *nodo_llamada(int linea, const char *nombre, Nodo *argumentos) {
-  Nodo *nodo = nodo_nuevo(NODO_LLAMADA, linea);
-  nodo->nombre = copiar_texto(nombre);
+/* Pasa los hijos de una lista temporal al nodo y libera la lista. */
+static void tomar_hijos(Nodo *nodo, Nodo *argumentos) {
   if (argumentos != NULL) {
     /* Los argumentos pasan a ser hijos directos de la llamada. */
     nodo->hijos = argumentos->hijos;
@@ -172,6 +171,32 @@ Nodo *nodo_llamada(int linea, const char *nombre, Nodo *argumentos) {
     argumentos->num_hijos = argumentos->capacidad = 0;
     ast_liberar(argumentos);
   }
+}
+
+Nodo *nodo_llamada(int linea, const char *nombre, Nodo *argumentos) {
+  Nodo *nodo = nodo_nuevo(NODO_LLAMADA, linea);
+  nodo->nombre = copiar_texto(nombre);
+  tomar_hijos(nodo, argumentos);
+  return nodo;
+}
+
+Nodo *nodo_bandeja(int linea, Nodo *lista) {
+  Nodo *nodo = nodo_nuevo(NODO_BANDEJA, linea);
+  tomar_hijos(nodo, lista);
+  return nodo;
+}
+
+Nodo *nodo_posicion(int linea, const char *nombre, Nodo *indice) {
+  Nodo *nodo = nodo_nuevo(NODO_POSICION, linea);
+  nodo->nombre = copiar_texto(nombre);
+  nodo_agregar_hijo(nodo, indice);
+  return nodo;
+}
+
+Nodo *nodo_agrega(int linea, Nodo *valor, const char *nombre) {
+  Nodo *nodo = nodo_nuevo(NODO_AGREGA, linea);
+  nodo->nombre = copiar_texto(nombre);
+  nodo_agregar_hijo(nodo, valor);
   return nodo;
 }
 
@@ -250,6 +275,9 @@ const char *ast_nombre_clase(TipoNodo clase) {
   case NODO_COMPARACION: return "Comparación";
   case NODO_LOGICA: return "Lógica";
   case NODO_NO: return "No";
+  case NODO_BANDEJA: return "Bandeja";
+  case NODO_POSICION: return "Posición";
+  case NODO_AGREGA: return "Agrega";
   }
   return "?";
 }
@@ -301,13 +329,15 @@ static void describir_detalle(const Nodo *nodo, char *destino, int tamano) {
              nodo->num_hijos == 1 ? "ón" : "ones");
     break;
   case NODO_DECLARACION:
-    snprintf(destino, (size_t)tamano, "molde %s%s %s",
+    snprintf(destino, (size_t)tamano, "molde %s%s%s %s",
              nodo->es_secreto ? "secreto " : "",
+             nodo->es_bandeja ? "bandeja de " : "",
              tipo_nombre(nodo->tipo_declarado), nodo->nombre);
     break;
   case NODO_ASIGNACION:
-    snprintf(destino, (size_t)tamano, "%s -> %s",
-             nombre_asignacion(nodo->asignacion), nodo->nombre);
+    snprintf(destino, (size_t)tamano, "%s -> %s%s",
+             nombre_asignacion(nodo->asignacion), nodo->nombre,
+             nodo->num_hijos > 1 ? "[posición]" : "");
     break;
   case NODO_SIRVE:
     snprintf(destino, (size_t)tamano, "mostrar en pantalla");
@@ -326,7 +356,10 @@ static void describir_detalle(const Nodo *nodo, char *destino, int tamano) {
     break;
   case NODO_FUNCION:
     snprintf(destino, (size_t)tamano, "%s()",
-             nodo->funcion == FUNC_DEGUSTAR ? "degustar" : "rebanar");
+             nodo->funcion == FUNC_DEGUSTAR  ? "degustar"
+             : nodo->funcion == FUNC_REBANAR ? "rebanar"
+             : nodo->funcion == FUNC_CUANTOS ? "cuantos"
+                                             : "saca");
     break;
   case NODO_PREPARACION:
     snprintf(destino, (size_t)tamano, "%s rinde %s", nodo->nombre,
@@ -370,6 +403,16 @@ static void describir_detalle(const Nodo *nodo, char *destino, int tamano) {
   case NODO_NO:
     snprintf(destino, (size_t)tamano, "no");
     break;
+  case NODO_BANDEJA:
+    snprintf(destino, (size_t)tamano, "%d elemento%s", nodo->num_hijos,
+             nodo->num_hijos == 1 ? "" : "s");
+    break;
+  case NODO_POSICION:
+    snprintf(destino, (size_t)tamano, "%s[ ]", nodo->nombre);
+    break;
+  case NODO_AGREGA:
+    snprintf(destino, (size_t)tamano, "al final de %s", nodo->nombre);
+    break;
   }
 }
 
@@ -385,7 +428,7 @@ static int es_expresion(const Nodo *nodo) {
          nodo->clase == NODO_OPERACION || nodo->clase == NODO_NEGATIVO ||
          nodo->clase == NODO_FUNCION || nodo->clase == NODO_LLAMADA ||
          nodo->clase == NODO_COMPARACION || nodo->clase == NODO_LOGICA ||
-         nodo->clase == NODO_NO;
+         nodo->clase == NODO_NO || nodo->clase == NODO_POSICION;
 }
 
 /* ------------------------------------------------------------------ */
@@ -425,7 +468,8 @@ static void imprimir_rama(const Nodo *nodo, const char *prefijo, int es_ultimo,
   }
   if (nodo->clase == NODO_DECLARACION || nodo->clase == NODO_ASIGNACION ||
       nodo->clase == NODO_SIRVE || nodo->clase == NODO_PREPARACION ||
-      nodo->clase == NODO_ENTREGA || nodo->clase == NODO_SI) {
+      nodo->clase == NODO_ENTREGA || nodo->clase == NODO_SI ||
+      nodo->clase == NODO_AGREGA) {
     printf("   [línea %d]", nodo->linea);
   }
   printf("\n");

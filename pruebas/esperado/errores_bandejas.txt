@@ -1,0 +1,10 @@
+  [línea 2] Error semántico: La mezcla se cortó: el elemento 2 de la bandeja 'huevos' es betun y la bandeja es de porciones.
+  [línea 6] Error semántico: La posición de una bandeja tiene que ser porciones, no tazas.
+  [línea 7] Error semántico: La mezcla se cortó: 'harina' es tazas y no acepta un valor de tipo betun.
+  [línea 8] Error semántico: 'huevos' es una bandeja: para cambiar un elemento usa  vierte <valor> en huevos[posición].  y para agregar  agrega <valor> a huevos.
+  [línea 9] Error semántico: 'huevos' es una bandeja: usa huevos[posición] o cuantos(huevos).
+  [línea 10] Error semántico: 'normal' no es una bandeja.
+  [línea 11] Error semántico: Esa bandeja no está en la mesa: 'galletas' no fue declarada.
+
+Compilación detenida: la mezcla tiene errores semánticos.
+codigo de salida: 1

@@ -109,6 +109,10 @@ static void cerrar_bloque(void) {
 %token T_O "o"
 %token T_Y_ADEMAS "y ademas"
 %token T_NO "no"
+%token T_BANDEJA_DE "bandeja de"
+%token T_AGREGA "agrega"
+%token T_CUANTOS "cuantos"
+%token T_SACA "saca"
 
 %token <texto>    T_TIPO          "tipo de dato"
 %token <texto>    T_ID            "nombre de molde"
@@ -121,7 +125,7 @@ static void cerrar_bloque(void) {
 %type <nodo> instrucciones instruccion declaracion asignacion salida expresion
 %type <nodo> preparacion ingredientes lista_ingredientes ingrediente pasos
 %type <nodo> llamada argumentos lista_argumentos entrega
-%type <nodo> condicional resto_si
+%type <nodo> condicional resto_si elementos
 %type <entero> tipo_que_rinde
 
 /* Precedencia: de menor a mayor. */
@@ -158,6 +162,8 @@ instruccion
     | llamada '.'                   { $$ = $1; /* p. ej.  decorar("Ana"). */ }
     | entrega '.'                   { $$ = $1; }
     | condicional                   { $$ = $1; }
+    | T_AGREGA expresion T_A T_ID '.'
+        { $$ = nodo_agrega(@1.first_line, $2, $4); free($4); }
     | error '.'                     { $$ = NULL; yyerrok; /* sigue con la siguiente instruccion */ }
     ;
 
@@ -168,6 +174,12 @@ declaracion
     | T_MOLDE T_TIPO T_ID T_CON expresion
         { $$ = nodo_declaracion(@1.first_line, 0, tipo_desde_texto($2), $3, $5);
           free($2); free($3); }
+    | T_MOLDE T_BANDEJA_DE T_TIPO T_ID
+        { $$ = nodo_declaracion(@1.first_line, 0, tipo_desde_texto($3), $4, NULL);
+          $$->es_bandeja = 1; free($3); free($4); }
+    | T_MOLDE T_BANDEJA_DE T_TIPO T_ID T_CON '[' elementos ']'
+        { $$ = nodo_declaracion(@1.first_line, 0, tipo_desde_texto($3), $4, $7);
+          $$->es_bandeja = 1; free($3); free($4); }
     | T_MOLDE T_SECRETO T_TIPO T_ID
         { /* Sintacticamente valido; el semantico avisa que le falta 'con'. */
           $$ = nodo_declaracion(@1.first_line, 1, tipo_desde_texto($3), $4, NULL);
@@ -180,6 +192,10 @@ declaracion
 asignacion
     : T_VIERTE expresion T_EN T_ID
         { $$ = nodo_asignacion(@1.first_line, ASIG_VIERTE, $2, $4); free($4); }
+    | T_VIERTE expresion T_EN T_ID '[' expresion ']'
+        { /* cambia una posicion de una bandeja: el 2do hijo es la posicion */
+          $$ = nodo_asignacion(@1.first_line, ASIG_VIERTE, $2, $4);
+          nodo_agregar_hijo($$, $6); free($4); }
     | T_ESPOLVOREA expresion T_A T_ID
         { $$ = nodo_asignacion(@1.first_line, ASIG_ESPOLVOREA, $2, $4); free($4); }
     | T_RASPA expresion T_A T_ID
@@ -252,6 +268,13 @@ resto_si
           $$ = nodo_bloque(NODO_SINO, sino); }
     ;
 
+/* ---------- Bandejas (Regla 6) ---------- */
+
+/* Elementos de una bandeja: [a y b y c]; se reusa la lista de argumentos. */
+elementos
+    : argumentos                    { $$ = nodo_bandeja(@$.first_line, $1); }
+    ;
+
 entrega
     : T_ENTREGA expresion           { $$ = nodo_entrega(@1.first_line, $2); }
     | T_ENTREGA                     { $$ = nodo_entrega(@1.first_line, NULL); }
@@ -289,6 +312,11 @@ expresion
     | '(' expresion ')'             { $$ = $2; /* los parentesis no crean nodo */ }
     | T_DEGUSTAR '(' expresion ')'  { $$ = nodo_funcion(@1.first_line, FUNC_DEGUSTAR, $3); }
     | T_REBANAR '(' expresion ')'   { $$ = nodo_funcion(@1.first_line, FUNC_REBANAR, $3); }
+    | T_CUANTOS '(' T_ID ')'
+        { $$ = nodo_funcion(@1.first_line, FUNC_CUANTOS, nodo_identificador(@3.first_line, $3)); free($3); }
+    | T_SACA '(' T_ID ')'
+        { $$ = nodo_funcion(@1.first_line, FUNC_SACA, nodo_identificador(@3.first_line, $3)); free($3); }
+    | T_ID '[' expresion ']'        { $$ = nodo_posicion(@1.first_line, $1, $3); free($1); }
     | llamada                       { $$ = $1; }
     | T_ID                          { $$ = nodo_identificador(@1.first_line, $1); free($1); }
     | T_LIT_PORCIONES               { $$ = nodo_literal_porciones(@1.first_line, $1); }
@@ -348,7 +376,7 @@ static int es_inicio_de_valor(yysymbol_kind_t s) {
   return s == YYSYMBOL_T_ID || s == YYSYMBOL_T_LIT_PORCIONES ||
          s == YYSYMBOL_T_LIT_TAZAS || s == YYSYMBOL_T_LIT_BETUN ||
          s == YYSYMBOL_T_LIT_CHISPA || s == YYSYMBOL_T_LIT_PUNTO ||
-         simbolo_es(s, "'('") || s == YYSYMBOL_T_NO || s == YYSYMBOL_T_DEGUSTAR ||
+         simbolo_es(s, "'('") || s == YYSYMBOL_T_NO || s == YYSYMBOL_T_DEGUSTAR || s == YYSYMBOL_T_CUANTOS || s == YYSYMBOL_T_SACA ||
          s == YYSYMBOL_T_REBANAR;
 }
 

@@ -46,6 +46,27 @@ static int resultado_porciones(long long resultado, int linea, Valor *salida) {
   return 1;
 }
 
+static int evaluar(const Nodo *nodo, Valor *salida);
+
+/* Devuelve el elemento bandeja[indice], o NULL si la posicion no existe. */
+static Valor *elemento_de_bandeja(const Nodo *nodo, const Nodo *indice) {
+  Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
+  if (simbolo == NULL) return NULL;
+  Valor posicion;
+  if (!evaluar(indice, &posicion)) return NULL;
+  Valor *bandeja = &simbolo->valor;
+  if (posicion.porciones < 0 || posicion.porciones >= bandeja->largo) {
+    reportar_error(FASE_EJECUCION, nodo->linea,
+                   "La bandeja '%s' tiene %d elemento%s: la posición %d no "
+                   "existe (van de 0 a %d).",
+                   simbolo->nombre, bandeja->largo,
+                   bandeja->largo == 1 ? "" : "s", posicion.porciones,
+                   bandeja->largo - 1);
+    return NULL;
+  }
+  return &bandeja->elementos[posicion.porciones];
+}
+
 /* Evalua una expresion. Si el resultado es betun, quien llama lo libera. */
 static int evaluar(const Nodo *nodo, Valor *salida) {
   memset(salida, 0, sizeof(*salida));
@@ -67,10 +88,15 @@ static int evaluar(const Nodo *nodo, Valor *salida) {
   case NODO_IDENTIFICADOR: {
     Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
     if (simbolo == NULL) return 0;
-    *salida = simbolo->valor;
-    if (salida->tipo == TIPO_BETUN) {
-      salida->betun = copiar_texto(simbolo->valor.betun);
-    }
+    valor_asignar(salida, &simbolo->valor); /* copia (betun y bandejas) */
+    return 1;
+  }
+
+  case NODO_POSICION: {
+    /* bandeja[posicion] */
+    Valor *elemento = elemento_de_bandeja(nodo, nodo->hijos[0]);
+    if (elemento == NULL) return 0;
+    valor_asignar(salida, elemento);
     return 1;
   }
 
@@ -127,6 +153,26 @@ static int evaluar(const Nodo *nodo, Valor *salida) {
   }
 
   case NODO_FUNCION: {
+    if (nodo->funcion == FUNC_CUANTOS || nodo->funcion == FUNC_SACA) {
+      Simbolo *simbolo = tabla_simbolo(mesa, nodo->hijos[0]->simbolo);
+      if (simbolo == NULL) return 0;
+      Valor *bandeja = &simbolo->valor;
+      if (nodo->funcion == FUNC_CUANTOS) {
+        salida->tipo = TIPO_PORCIONES;
+        salida->porciones = bandeja->largo;
+        return 1;
+      }
+      /* saca: entrega el ultimo elemento y lo quita de la bandeja */
+      if (bandeja->largo == 0) {
+        reportar_error(FASE_EJECUCION, nodo->linea,
+                       "No se puede sacar nada: la bandeja '%s' está vacía.",
+                       simbolo->nombre);
+        return 0;
+      }
+      bandeja->largo--;
+      *salida = bandeja->elementos[bandeja->largo];
+      return 1;
+    }
     Valor argumento;
     if (!evaluar(nodo->hijos[0], &argumento)) return 0;
     if (nodo->funcion == FUNC_DEGUSTAR) {
@@ -225,6 +271,24 @@ static int evaluar(const Nodo *nodo, Valor *salida) {
 static int ejecutar_declaracion(const Nodo *nodo) {
   Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
   if (simbolo == NULL) return 0;
+  if (nodo->es_bandeja) {
+    /* Bandeja nueva con los elementos de [a y b y c] */
+    Valor bandeja = valor_bandeja_vacia(simbolo->tipo);
+    const Nodo *lista = nodo->num_hijos > 0 ? nodo->hijos[0] : NULL;
+    for (int i = 0; lista != NULL && i < lista->num_hijos; i++) {
+      Valor elemento;
+      if (!evaluar(lista->hijos[i], &elemento)) {
+        valor_liberar(&bandeja);
+        return 0;
+      }
+      elemento = convertir(elemento, simbolo->tipo);
+      bandeja_agregar(&bandeja, &elemento);
+      valor_liberar(&elemento);
+    }
+    valor_asignar(&simbolo->valor, &bandeja);
+    valor_liberar(&bandeja);
+    return 1;
+  }
   if (nodo->num_hijos == 0) {
     /* Valor por defecto (se reinicia en cada llamada a una preparacion). */
     Valor defecto = valor_por_defecto(simbolo->tipo);
@@ -243,6 +307,17 @@ static int ejecutar_declaracion(const Nodo *nodo) {
 static int ejecutar_asignacion(const Nodo *nodo) {
   Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
   if (simbolo == NULL) return 0;
+
+  if (nodo->num_hijos > 1) {
+    /* vierte <valor> en bandeja[posicion]. */
+    Valor valor;
+    if (!evaluar(nodo->hijos[0], &valor)) return 0;
+    valor = convertir(valor, simbolo->tipo);
+    Valor *elemento = elemento_de_bandeja(nodo, nodo->hijos[1]);
+    if (elemento != NULL) valor_asignar(elemento, &valor);
+    valor_liberar(&valor);
+    return elemento != NULL;
+  }
 
   Valor valor;
   if (!evaluar(nodo->hijos[0], &valor)) return 0;
@@ -293,10 +368,28 @@ static int ejecutar_asignacion(const Nodo *nodo) {
   return ok;
 }
 
+/* agrega <valor> a bandeja. */
+static int ejecutar_agrega(const Nodo *nodo) {
+  Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
+  if (simbolo == NULL) return 0;
+  Valor valor;
+  if (!evaluar(nodo->hijos[0], &valor)) return 0;
+  valor = convertir(valor, simbolo->tipo);
+  bandeja_agregar(&simbolo->valor, &valor);
+  valor_liberar(&valor);
+  return 1;
+}
+
 static int ejecutar_sirve(const Nodo *nodo) {
   Valor valor;
   if (!evaluar(nodo->hijos[0], &valor)) return 0;
-  char texto[64];
+  char texto[1024];
+  if (valor.es_bandeja) {
+    valor_a_texto(&valor, texto, sizeof(texto));
+    printf("%s\n", texto);
+    valor_liberar(&valor);
+    return 1;
+  }
   switch (valor.tipo) {
   case TIPO_BETUN:
     printf("%s\n", valor.betun);
@@ -424,6 +517,7 @@ static Resultado ejecutar_instrucciones(Nodo *const *instrucciones, int cantidad
     case NODO_DECLARACION: ok = ejecutar_declaracion(instruccion); break;
     case NODO_ASIGNACION: ok = ejecutar_asignacion(instruccion); break;
     case NODO_SIRVE: ok = ejecutar_sirve(instruccion); break;
+    case NODO_AGREGA: ok = ejecutar_agrega(instruccion); break;
     case NODO_LLAMADA: {
       /* Llamada sola como instruccion: el valor (si hay) se descarta. */
       Valor descartado;

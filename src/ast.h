@@ -41,7 +41,12 @@ typedef enum {
   NODO_SINO,          /* instrucciones que corren si es crudo         */
   NODO_COMPARACION,   /* a mayor que b, a igual a b, ...              */
   NODO_LOGICA,        /* a o b,  a y ademas b                         */
-  NODO_NO             /* no a                                         */
+  NODO_NO,            /* no a                                         */
+
+  /* Bandejas (Regla 6) */
+  NODO_BANDEJA,       /* [10 y 20 y 30]                               */
+  NODO_POSICION,      /* huevos[1]                                    */
+  NODO_AGREGA         /* agrega 40 a huevos.                          */
 } TipoNodo;
 
 typedef enum {
@@ -57,7 +62,7 @@ typedef enum { LOGICA_O, LOGICA_Y } TipoLogica;
 
 typedef enum { ASIG_VIERTE, ASIG_ESPOLVOREA, ASIG_RASPA } TipoAsignacion;
 
-typedef enum { FUNC_DEGUSTAR, FUNC_REBANAR } TipoFuncion;
+typedef enum { FUNC_DEGUSTAR, FUNC_REBANAR, FUNC_CUANTOS, FUNC_SACA } TipoFuncion;
 
 typedef struct Nodo {
   int id;
@@ -75,6 +80,7 @@ typedef struct Nodo {
   TipoDato tipo_declarado; /* NODO_DECLARACION, NODO_INGREDIENTE, y en
                               NODO_PREPARACION el tipo que rinde */
   int es_secreto;          /* NODO_DECLARACION */
+  int es_bandeja;          /* NODO_DECLARACION: molde bandeja de ... */
   TipoAsignacion asignacion;
   char operador;           /* '+', '-', '*', '/' en NODO_OPERACION */
   TipoFuncion funcion;
@@ -139,6 +145,12 @@ Nodo *nodo_logica(int linea, TipoLogica logica, Nodo *izquierda, Nodo *derecha);
 Nodo *nodo_no(int linea, Nodo *expresion);
 
 const char *comparacion_texto(TipoComparacion comparacion);
+
+/* Bandejas: [a y b y c] (lista puede ser NULL = bandeja vacia),
+   nombre[indice] y  agrega valor a nombre. */
+Nodo *nodo_bandeja(int linea, Nodo *lista);
+Nodo *nodo_posicion(int linea, const char *nombre, Nodo *indice);
+Nodo *nodo_agrega(int linea, Nodo *valor, const char *nombre);
 
 void nodo_agregar_hijo(Nodo *padre, Nodo *hijo);
 

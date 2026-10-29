@@ -127,7 +127,7 @@ const char *categoria_nombre(Categoria categoria) {
 
 void tabla_imprimir(const TablaSimbolos *tabla, int con_valores) {
   enum { COLUMNAS = 10 };
-  const int anchos[COLUMNAS] = {20, 11, 9, 6, 20, 5, 14, 4, 7, 20};
+  const int anchos[COLUMNAS] = {20, 11, 11, 8, 20, 5, 14, 4, 7, 20};
   const char *encabezado[COLUMNAS] = {"Nombre", "Categoría", "Tipo",
                                       "En C",   "Ámbito",    "Línea",
                                       "Detalle", "Usos",     "Cambios",
@@ -172,10 +172,15 @@ void tabla_imprimir(const TablaSimbolos *tabla, int con_valores) {
       }
     }
 
+    char tipo[32], tipo_c[32];
+    snprintf(tipo, sizeof(tipo), "%s%s", tipo_nombre(s->tipo),
+             s->es_bandeja ? "[]" : "");
+    snprintf(tipo_c, sizeof(tipo_c), "%s%s", tipo_equivalente_c(s->tipo),
+             s->es_bandeja ? "[]" : "");
     const char *celdas[COLUMNAS] = {s->nombre,
                                     categoria_nombre(s->categoria),
-                                    tipo_nombre(s->tipo),
-                                    tipo_equivalente_c(s->tipo),
+                                    tipo,
+                                    tipo_c,
                                     s->ambito,
                                     linea,
                                     detalle,
@@ -213,7 +218,45 @@ Valor valor_por_defecto(TipoDato tipo) {
   return valor;
 }
 
+Valor valor_bandeja_vacia(TipoDato tipo) {
+  Valor valor;
+  memset(&valor, 0, sizeof(valor));
+  valor.tipo = tipo;
+  valor.es_bandeja = 1;
+  return valor;
+}
+
+void bandeja_agregar(Valor *bandeja, const Valor *elemento) {
+  if (bandeja->largo == bandeja->capacidad) {
+    int nueva = bandeja->capacidad == 0 ? 4 : bandeja->capacidad * 2;
+    Valor *mas = realloc(bandeja->elementos, (size_t)nueva * sizeof(*mas));
+    if (mas == NULL) {
+      fprintf(stderr, "Sin memoria\n");
+      exit(EXIT_FAILURE);
+    }
+    bandeja->elementos = mas;
+    bandeja->capacidad = nueva;
+  }
+  Valor *nuevo = &bandeja->elementos[bandeja->largo++];
+  memset(nuevo, 0, sizeof(*nuevo));
+  valor_asignar(nuevo, elemento);
+}
+
 void valor_a_texto(const Valor *valor, char *destino, int tamano) {
+  if (valor->es_bandeja) {
+    /* [10 y 20 y 30] */
+    int usado = snprintf(destino, (size_t)tamano, "[");
+    for (int i = 0; i < valor->largo && usado < tamano; i++) {
+      char elemento[128];
+      valor_a_texto(&valor->elementos[i], elemento, sizeof(elemento));
+      usado += snprintf(destino + usado, (size_t)(tamano - usado), "%s%s",
+                        i > 0 ? " y " : "", elemento);
+    }
+    if (usado < tamano) {
+      snprintf(destino + usado, (size_t)(tamano - usado), "]");
+    }
+    return;
+  }
   switch (valor->tipo) {
   case TIPO_PORCIONES:
     snprintf(destino, (size_t)tamano, "%d", valor->porciones);
@@ -240,16 +283,31 @@ void valor_a_texto(const Valor *valor, char *destino, int tamano) {
 }
 
 void valor_asignar(Valor *destino, const Valor *origen) {
-  char *betun_nuevo = NULL;
-  if (origen->tipo == TIPO_BETUN) {
-    betun_nuevo = copiar_texto(origen->betun ? origen->betun : "");
+  if (destino == origen) return;
+  Valor copia = *origen;
+  copia.betun = NULL;
+  if (!origen->es_bandeja && origen->tipo == TIPO_BETUN) {
+    copia.betun = copiar_texto(origen->betun ? origen->betun : "");
+  }
+  if (origen->es_bandeja) {
+    /* Una bandeja se copia elemento por elemento. */
+    copia.elementos = NULL;
+    copia.largo = copia.capacidad = 0;
+    for (int i = 0; i < origen->largo; i++) {
+      bandeja_agregar(&copia, &origen->elementos[i]);
+    }
   }
   valor_liberar(destino);
-  *destino = *origen;
-  destino->betun = betun_nuevo;
+  *destino = copia;
 }
 
 void valor_liberar(Valor *valor) {
   free(valor->betun);
   valor->betun = NULL;
+  for (int i = 0; i < valor->largo; i++) {
+    valor_liberar(&valor->elementos[i]);
+  }
+  free(valor->elementos);
+  valor->elementos = NULL;
+  valor->largo = valor->capacidad = 0;
 }

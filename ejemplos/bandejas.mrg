@@ -1,0 +1,25 @@
+~ =============================================================
+~  Receta: bandejas (Regla 6) - una bandeja es como un array
+~  Guarda varios valores del mismo tipo; las posiciones empiezan en 0.
+~ =============================================================
+
+molde bandeja de porciones huevos con [10 y 20 y 30].   ~ int[] huevos = {10, 20, 30}
+molde bandeja de betun sabores.                         ~ empieza vacia
+molde porciones posicion con 1.
+
+sirve huevos.                     ~ [10 y 20 y 30]
+sirve huevos[posicion].           ~ 20
+sirve cuantos(huevos).            ~ 3   (cuantos elementos tiene)
+
+vierte 25 en huevos[1].           ~ cambia la posicion 1
+agrega 40 a huevos.               ~ agrega al final
+sirve huevos.                     ~ [10 y 25 y 30 y 40]
+sirve huevos[cuantos(huevos) - 1].   ~ 40 (el ultimo)
+
+molde porciones ultimo con saca(huevos).   ~ saca el ultimo: 40
+sirve ultimo.
+sirve cuantos(huevos).            ~ 3
+
+agrega "chocolate" a sabores.
+agrega "vainilla" a sabores.
+sirve sabores.                    ~ ["chocolate" y "vainilla"]

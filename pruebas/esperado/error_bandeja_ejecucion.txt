@@ -1,0 +1,5 @@
+30
+  [línea 4] Error de ejecución: La bandeja 'huevos' tiene 3 elementos: la posición 3 no existe (van de 0 a 2).
+
+La receta se quemó: la ejecución se detuvo.
+codigo de salida: 1

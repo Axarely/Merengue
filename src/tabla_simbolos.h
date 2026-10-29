@@ -20,13 +20,19 @@
 
 #include "tipos.h"
 
-typedef struct {
-  TipoDato tipo;
+typedef struct Valor {
+  TipoDato tipo;           /* en una bandeja: el tipo de sus elementos */
   int porciones;
   double tazas;
   char *betun; /* memoria propia */
   char chispa;
   int punto;
+
+  /* Bandejas (Regla 6): lista de valores del mismo tipo, como un array. */
+  int es_bandeja;
+  struct Valor *elementos; /* memoria propia */
+  int largo;
+  int capacidad;
 } Valor;
 
 typedef enum {
@@ -51,6 +57,7 @@ typedef struct {
   const void *definicion;  /* solo preparaciones: su nodo del AST */
   int primer_local;        /* solo preparaciones: posicion de su primer */
   int num_locales;         /* ingrediente/molde local y cuantos tiene  */
+  int es_bandeja;          /* 1 si es una bandeja (array) */
   Valor valor;             /* valor durante la ejecucion */
 } Simbolo;
 
@@ -98,7 +105,13 @@ Valor valor_por_defecto(TipoDato tipo);
 /* Texto del valor, al estilo Merengue (2,5  "hola"  'A'  dorado). */
 void valor_a_texto(const Valor *valor, char *destino, int tamano);
 
-/* Reemplaza el valor guardado (copia el betun). */
+/* Bandeja vacia cuyos elementos son del tipo dado. */
+Valor valor_bandeja_vacia(TipoDato tipo);
+
+/* Agrega una copia de "elemento" al final de la bandeja. */
+void bandeja_agregar(Valor *bandeja, const Valor *elemento);
+
+/* Reemplaza el valor guardado (copia el betun y los elementos). */
 void valor_asignar(Valor *destino, const Valor *origen);
 
 void valor_liberar(Valor *valor);

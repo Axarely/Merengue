@@ -92,6 +92,12 @@ NO_ASCII     [\x80-\xff]
 "y"{ESP}"ademas"/{FIN_PALABRA} { REGISTRAR("OPERADOR_LOGICO"); ENTREGAR(T_Y_ADEMAS); }
 "no"                        { REGISTRAR("OPERADOR_LOGICO"); ENTREGAR(T_NO); }
 
+ /* Bandejas (Regla 6) */
+"bandeja"{ESP}"de"/{FIN_PALABRA} { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_BANDEJA_DE); }
+"agrega"                    { REGISTRAR("PALABRA_RESERVADA"); ENTREGAR(T_AGREGA); }
+"cuantos"                   { REGISTRAR("FUNCION_INTEGRADA"); ENTREGAR(T_CUANTOS); }
+"saca"                      { REGISTRAR("FUNCION_INTEGRADA"); ENTREGAR(T_SACA); }
+
 "degustar"                  { REGISTRAR("FUNCION_INTEGRADA"); ENTREGAR(T_DEGUSTAR); }
 "rebanar"                   { REGISTRAR("FUNCION_INTEGRADA"); ENTREGAR(T_REBANAR); }
 
@@ -209,6 +215,7 @@ NO_ASCII     [\x80-\xff]
  /* ---------- Operadores y simbolos ---------- */
 "+"|"-"|"*"|"/"             { REGISTRAR("OPERADOR"); ENTREGAR(yytext[0]); }
 "("|")"                     { REGISTRAR("PARENTESIS"); ENTREGAR(yytext[0]); }
+"["|"]"                     { REGISTRAR("CORCHETE"); ENTREGAR(yytext[0]); }
 "."                         { REGISTRAR("FIN_INSTRUCCION"); ENTREGAR('.'); }
 ":"                         { REGISTRAR("INICIO_DE_PASOS"); ENTREGAR(':'); }
 

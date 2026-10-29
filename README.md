@@ -33,7 +33,7 @@ receta.mrg ──► Léxico ──► Sintáctico ──► Semántico ──�
 4. Tienen un máximo de 30 caracteres.
 5. No pueden ser palabras reservadas.
 
-**Palabras reservadas:** `molde`, `secreto`, `con`, `vierte`, `en`, `espolvorea`, `raspa`, `a`, `sirve`, `porciones`, `tazas`, `betun`, `chispa`, `punto`, `dorado`, `crudo`, `degustar`, `rebanar`, `preparacion`, `rinde`, `nada`, `entrega`, `fin`, `y`, `si`, `sino`, `o`, `no`, y las frases `mayor que`, `menor que`, `mayor o igual que`, `menor o igual que`, `igual a`, `distinto de`, `y ademas`.
+**Palabras reservadas:** `molde`, `secreto`, `con`, `vierte`, `en`, `espolvorea`, `raspa`, `a`, `sirve`, `porciones`, `tazas`, `betun`, `chispa`, `punto`, `dorado`, `crudo`, `degustar`, `rebanar`, `preparacion`, `rinde`, `nada`, `entrega`, `fin`, `y`, `si`, `sino`, `o`, `no`, y las frases `mayor que`, `menor que`, `mayor o igual que`, `menor o igual que`, `igual a`, `distinto de`, `y ademas`. Para las bandejas: `bandeja de`, `agrega`, `cuantos`, `saca`.
 
 ### Regla 1: Declaración de variables
 
@@ -184,6 +184,37 @@ Reglas:
 
 Precedencia, de menor a mayor: `o` → `y ademas` → `no` → comparaciones → `+ -` → `* /` → signo `-`.
 
+### Regla 6: Bandejas (arrays)
+
+Una **bandeja** guarda varios valores del mismo tipo, como un array. Las posiciones empiezan en 0, como en C.
+
+```
+molde bandeja de porciones huevos con [10 y 20 y 30].   ~ int[] huevos = {10, 20, 30}
+molde bandeja de betun sabores.                         ~ empieza vacía
+
+sirve huevos[1].                  ~ 20
+vierte 25 en huevos[1].           ~ cambia una posición
+sirve cuantos(huevos).            ~ 3   (cuántos elementos tiene)
+agrega 40 a huevos.               ~ agrega al final
+molde porciones ultimo con saca(huevos).   ~ saca el último (40)
+sirve huevos.                     ~ [10 y 25 y 30]
+```
+
+| Merengue | En el ejemplo de clase |
+| --- | --- |
+| `molde bandeja de porciones huevos con [10 y 20].` | `var: int[] values = [10, 20];` |
+| `huevos[1]` | `values[1]` |
+| `cuantos(huevos)` | `values.length()` |
+| `agrega 40 a huevos.` | `values.push(40);` |
+| `saca(huevos)` | `values.pop()` |
+
+Reglas:
+
+1. Los elementos se separan con `y` (la coma es el decimal) y todos tienen que ser del tipo de la bandeja.
+2. La posición tiene que ser `porciones`.
+3. Una bandeja se usa con su posición (`huevos[1]`), con `cuantos`, `agrega` y `saca`, o completa con `sirve huevos.`
+4. Al ejecutar: pedir una posición que no existe, o usar `saca` en una bandeja vacía, detiene la receta con un error.
+
 ### Instrucción de salida
 
 ```
@@ -282,6 +313,9 @@ pasos         → pasos instruccion | ε
 entrega       → entrega expresion | entrega
 llamada       → NOMBRE '(' argumentos ')'
 argumentos    → expresion (y expresion)* | ε
+declaracion   → molde bandeja de TIPO NOMBRE [con '[' argumentos ']']
+asignacion    → vierte expresion en NOMBRE '[' expresion ']'
+instruccion   → agrega expresion a NOMBRE '.'
 condicional   → si expresion ':' pasos resto_si
 resto_si      → fin '.'
               | sino ':' pasos fin '.'
@@ -291,6 +325,7 @@ expresion     → expresion '+' expresion | expresion '-' expresion
               | '-' expresion | '(' expresion ')'
               | degustar '(' expresion ')' | rebanar '(' expresion ')'
               | llamada
+              | NOMBRE '[' expresion ']' | cuantos '(' NOMBRE ')' | saca '(' NOMBRE ')'
               | NOMBRE | PORCIONES | TAZAS | BETUN | CHISPA | PUNTO
               | expresion (mayor que | menor que | mayor o igual que
                            | menor o igual que | igual a | distinto de) expresion
@@ -345,6 +380,9 @@ Cada fase reporta todos los errores que encuentra, con su número de línea. El 
 | `ejemplos/errores_preparaciones.mrg` | Errores semánticos de las preparaciones |
 | `ejemplos/condicionales.mrg` | `si` / `sino si` / `sino`, comparaciones, `o` / `y ademas` / `no`, `si` dentro de una preparación, recursión y ámbito de bloque |
 | `ejemplos/errores_condicionales.mrg` | Errores semánticos del `si` |
+| `ejemplos/bandejas.mrg` | Bandejas: declarar, leer y cambiar posiciones, `cuantos`, `agrega`, `saca` |
+| `ejemplos/errores_bandejas.mrg` | Errores semánticos de las bandejas |
+| `ejemplos/error_bandeja_ejecucion.mrg` | Posición que no existe (error al ejecutar) |
 | `ejemplos/error_ejecucion.mrg` | Un error que solo aparece al ejecutar |
 
 ## Estructura del repositorio

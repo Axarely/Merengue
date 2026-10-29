@@ -56,6 +56,39 @@ static int es_cero_literal(const Nodo *nodo) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Bandejas (Regla 6)                                                  */
+/* ------------------------------------------------------------------ */
+
+static TipoDato analizar_expresion(Nodo *nodo);
+
+/* Busca una bandeja por nombre. Devuelve su posicion o -1 (con error). */
+static int buscar_bandeja(const char *nombre, int linea) {
+  int posicion = tabla_buscar(mesa, nombre);
+  Simbolo *simbolo = tabla_simbolo(mesa, posicion);
+  if (simbolo == NULL) {
+    reportar_error(FASE_SEMANTICA, linea,
+                   "Esa bandeja no está en la mesa: '%s' no fue declarada.",
+                   nombre);
+    return -1;
+  }
+  if (!simbolo->es_bandeja) {
+    reportar_error(FASE_SEMANTICA, linea, "'%s' no es una bandeja.", nombre);
+    return -1;
+  }
+  return posicion;
+}
+
+/* La posicion de una bandeja tiene que ser porciones (un entero). */
+static void revisar_posicion(Nodo *indice) {
+  TipoDato tipo = analizar_expresion(indice);
+  if (tipo != TIPO_DESCONOCIDO && tipo != TIPO_PORCIONES) {
+    reportar_error(FASE_SEMANTICA, indice->linea,
+                   "La posición de una bandeja tiene que ser porciones, no %s.",
+                   tipo_nombre(tipo));
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Llamadas a preparaciones (Regla 4)                                  */
 /* ------------------------------------------------------------------ */
 
@@ -157,6 +190,10 @@ static TipoDato analizar_expresion(Nodo *nodo) {
       reportar_error(FASE_SEMANTICA, nodo->linea,
                      "'%s' es una preparación: para usarla escribe %s(...).",
                      nodo->nombre, nodo->nombre);
+    } else if (simbolo->es_bandeja) {
+      reportar_error(FASE_SEMANTICA, nodo->linea,
+                     "'%s' es una bandeja: usa %s[posición] o cuantos(%s).",
+                     nodo->nombre, nodo->nombre, nodo->nombre);
     } else {
       simbolo->usos++;
       nodo->simbolo = posicion;
@@ -205,7 +242,37 @@ static TipoDato analizar_expresion(Nodo *nodo) {
     return nodo->tipo_dato;
   }
 
+  case NODO_POSICION: {
+    /* huevos[1]: el tipo es el de los elementos de la bandeja */
+    revisar_posicion(nodo->hijos[0]);
+    int posicion = buscar_bandeja(nodo->nombre, nodo->linea);
+    nodo->tipo_dato = TIPO_DESCONOCIDO;
+    if (posicion >= 0) {
+      Simbolo *bandeja = tabla_simbolo(mesa, posicion);
+      bandeja->usos++;
+      nodo->simbolo = posicion;
+      nodo->tipo_dato = bandeja->tipo;
+    }
+    return nodo->tipo_dato;
+  }
+
   case NODO_FUNCION: {
+    if (nodo->funcion == FUNC_CUANTOS || nodo->funcion == FUNC_SACA) {
+      /* cuantos(bandeja) -> porciones;  saca(bandeja) -> un elemento */
+      Nodo *argumento = nodo->hijos[0];
+      int posicion = buscar_bandeja(argumento->nombre, nodo->linea);
+      nodo->tipo_dato = TIPO_DESCONOCIDO;
+      if (posicion >= 0) {
+        Simbolo *bandeja = tabla_simbolo(mesa, posicion);
+        bandeja->usos++;
+        if (nodo->funcion == FUNC_SACA) bandeja->modificaciones++;
+        argumento->simbolo = posicion;
+        argumento->tipo_dato = bandeja->tipo;
+        nodo->tipo_dato =
+            nodo->funcion == FUNC_CUANTOS ? TIPO_PORCIONES : bandeja->tipo;
+      }
+      return nodo->tipo_dato;
+    }
     TipoDato argumento = analizar_expresion(nodo->hijos[0]);
     if (nodo->funcion == FUNC_DEGUSTAR) {
       /* degustar acepta cualquier tipo y devuelve su nombre como betun. */
@@ -307,7 +374,20 @@ static void analizar_declaracion(Nodo *nodo) {
 
   /* El valor se revisa ANTES de agregar el molde a la mesa:
      asi "molde porciones x con x." da error (x todavia no existe). */
-  if (valor_inicial != NULL) {
+  if (valor_inicial != NULL && nodo->es_bandeja) {
+    /* [a y b y c]: cada elemento tiene que ser del tipo de la bandeja */
+    for (int i = 0; i < valor_inicial->num_hijos; i++) {
+      TipoDato tipo = analizar_expresion(valor_inicial->hijos[i]);
+      if (tipo != TIPO_DESCONOCIDO &&
+          !tipos_compatibles(nodo->tipo_declarado, tipo)) {
+        reportar_error(FASE_SEMANTICA, nodo->linea,
+                       "La mezcla se cortó: el elemento %d de la bandeja '%s' "
+                       "es %s y la bandeja es de %s.",
+                       i + 1, nodo->nombre, tipo_nombre(tipo),
+                       tipo_nombre(nodo->tipo_declarado));
+      }
+    }
+  } else if (valor_inicial != NULL) {
     TipoDato tipo_valor = analizar_expresion(valor_inicial);
     if (tipo_valor != TIPO_DESCONOCIDO &&
         !tipos_compatibles(nodo->tipo_declarado, tipo_valor)) {
@@ -357,11 +437,33 @@ static void analizar_declaracion(Nodo *nodo) {
   nodo->simbolo = tabla_insertar(mesa, nodo->nombre, nodo->tipo_declarado,
                                  nodo->es_secreto ? CAT_SECRETO : CAT_MOLDE,
                                  nodo->linea, valor_inicial != NULL);
+  if (nodo->es_bandeja) {
+    Simbolo *simbolo = tabla_simbolo(mesa, nodo->simbolo);
+    simbolo->es_bandeja = 1;
+    valor_liberar(&simbolo->valor);
+    simbolo->valor = valor_bandeja_vacia(nodo->tipo_declarado);
+  }
 }
 
 /* Regla 2: vierte / espolvorea / raspa. */
 static void analizar_asignacion(Nodo *nodo) {
   TipoDato tipo_valor = analizar_expresion(nodo->hijos[0]);
+
+  if (nodo->num_hijos > 1) {
+    /* vierte <valor> en bandeja[posicion]. */
+    revisar_posicion(nodo->hijos[1]);
+    int posicion = buscar_bandeja(nodo->nombre, nodo->linea);
+    if (posicion < 0) return;
+    Simbolo *bandeja = tabla_simbolo(mesa, posicion);
+    nodo->simbolo = posicion;
+    nodo->tipo_dato = bandeja->tipo;
+    bandeja->modificaciones++;
+    if (tipo_valor != TIPO_DESCONOCIDO &&
+        !tipos_compatibles(bandeja->tipo, tipo_valor)) {
+      reportar_mezcla(nodo->linea, nodo->nombre, bandeja->tipo, tipo_valor);
+    }
+    return;
+  }
 
   int posicion = tabla_buscar(mesa, nodo->nombre);
   Simbolo *simbolo = tabla_simbolo(mesa, posicion);
@@ -375,6 +477,14 @@ static void analizar_asignacion(Nodo *nodo) {
     reportar_error(FASE_SEMANTICA, nodo->linea,
                    "'%s' es una preparación: no se le puede verter un valor.",
                    nodo->nombre);
+    return;
+  }
+  if (simbolo->es_bandeja) {
+    reportar_error(FASE_SEMANTICA, nodo->linea,
+                   "'%s' es una bandeja: para cambiar un elemento usa  vierte "
+                   "<valor> en %s[posición].  y para agregar  agrega <valor> a "
+                   "%s.",
+                   nodo->nombre, nodo->nombre, nodo->nombre);
     return;
   }
   nodo->simbolo = posicion;
@@ -677,9 +787,35 @@ static void analizar_instruccion(Nodo *instruccion) {
   case NODO_ASIGNACION:
     analizar_asignacion(instruccion);
     break;
-  case NODO_SIRVE:
-    analizar_expresion(instruccion->hijos[0]);
+  case NODO_SIRVE: {
+    /* sirve bandeja.  muestra la bandeja completa */
+    Nodo *valor = instruccion->hijos[0];
+    int posicion = valor->clase == NODO_IDENTIFICADOR
+                       ? tabla_buscar(mesa, valor->nombre)
+                       : -1;
+    Simbolo *simbolo = tabla_simbolo(mesa, posicion);
+    if (simbolo != NULL && simbolo->es_bandeja) {
+      simbolo->usos++;
+      valor->simbolo = posicion;
+      valor->tipo_dato = simbolo->tipo;
+    } else {
+      analizar_expresion(valor);
+    }
     break;
+  }
+  case NODO_AGREGA: {
+    /* agrega <valor> a bandeja. */
+    TipoDato tipo = analizar_expresion(instruccion->hijos[0]);
+    int posicion = buscar_bandeja(instruccion->nombre, instruccion->linea);
+    if (posicion < 0) break;
+    Simbolo *bandeja = tabla_simbolo(mesa, posicion);
+    instruccion->simbolo = posicion;
+    bandeja->modificaciones++;
+    if (tipo != TIPO_DESCONOCIDO && !tipos_compatibles(bandeja->tipo, tipo)) {
+      reportar_mezcla(instruccion->linea, instruccion->nombre, bandeja->tipo, tipo);
+    }
+    break;
+  }
   case NODO_PREPARACION:
     analizar_preparacion(instruccion);
     break;
